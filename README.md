@@ -1,23 +1,23 @@
 # LAMBA - Learning Activities & Machine-Based Assessment
 
-An LTI activity for submitting and evaluating educational assignments with automated feedback using LAMB <https://lamb-project.org>. It integrates with LMS platforms like <https://moodle.org> via LTI 1.1.
+Sistema de gestión de actividades educativas con evaluación automatizada mediante IA generativa, integrado con Moodle mediante LTI.
 
-## Features
+## Características
 
-- 🎓 **Activity Management**: Create and manage individual or group activities
-- 🤖 **Automated Assessment**: Integration with LAMB models for AI-powered evaluation
-- 📝 **Student Submissions**: Individual or group submission system with shared codes
-- 📊 **Grading**: Automatic grade submission to Moodle via LTI
-- 🌐 **Multilingual**: Support for Catalan, Spanish, and English
-- 🔒 **LTI Integration**: Authentication and authorization via LTI 1.1
+- 🎓 **Gestión de actividades**: Crea y administra actividades individuales o grupales
+- 🤖 **Evaluación automatizada**: Integración con modelos LAMB para evaluación mediante IA
+- 📝 **Entregas de estudiantes**: Sistema de entregas individuales o grupales con códigos compartidos
+- 📊 **Calificaciones**: Envío automático de calificaciones a Moodle mediante LTI
+- 🌐 **Multiidioma**: Soporte para Catalán, Español e Inglés
+- 🔒 **Integración LTI**: Autenticación y autorización mediante LTI 1.1
 
-## Requirements
+## Requisitos
 
 - Python 3.8+
 - Node.js 18+
-- Moodle with LTI 1.1 support
+- Moodle con soporte LTI 1.1
 
-## Installation
+## Instalación
 
 ### 1. Backend
 
@@ -26,12 +26,12 @@ cd backend
 pip install -r requirements.txt
 ```
 
-Create a `.env` file based on `env.example`:
+Crea un archivo `.env` basado en `env.example`:
 
 ```env
 # LTI Configuration (REQUIRED)
-OAUTH_CONSUMER_KEY=your_consumer_key
-LTI_SECRET=your_secret
+OAUTH_CONSUMER_KEY=tu_consumer_key
+LTI_SECRET=tu_secret
 
 # Database Configuration (OPTIONAL)
 DATABASE_URL=sqlite:///./lamba.db
@@ -42,7 +42,7 @@ ALLOWED_ORIGINS=*
 
 # LAMB API Configuration (OPTIONAL)
 LAMB_API_URL=http://lamb.lamb-project.org:9099
-LAMB_BEARER_TOKEN=your_token
+LAMB_BEARER_TOKEN=tu_token
 LAMB_TIMEOUT=30
 
 # Administrator Credentials (OPTIONAL)
@@ -50,7 +50,7 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin
 ```
 
-**Note**: If you use `https_server.py`, the `HTTPS_ENABLED` and `ALLOWED_ORIGINS` variables are automatically configured for HTTPS. For production, change `ALLOWED_ORIGINS` to the specific allowed domains.
+**Nota**: Si usas `https_server.py`, las variables `HTTPS_ENABLED` y `ALLOWED_ORIGINS` se configuran automáticamente para HTTPS. Para producción, cambia `ALLOWED_ORIGINS` a los dominios específicos permitidos.
 
 ### 2. Frontend
 
@@ -60,277 +60,265 @@ npm install
 npm run build
 ```
 
-## Running the Application
+## Ejecución
 
-### Option 1: HTTPS (Recommended for production and development with Moodle)
+### Opción 1: HTTPS (Recomendado para producción y desarrollo con Moodle)
 
-1. **Generate SSL certificates** (first time only):
+1. **Genera los certificados SSL** (solo la primera vez):
 
 ```bash
 cd backend
 python generate_ssl_cert.py
 ```
 
-This will create self-signed certificates in the `backend/ssl/` folder:
+Esto creará los certificados autofirmados en la carpeta `backend/ssl/`:
+- `cert.pem` - Certificado SSL
+- `key.pem` - Clave privada
 
-- `cert.pem` - SSL Certificate
-- `key.pem` - Private Key
-
-2. **Start the HTTPS server**:
+2. **Inicia el servidor HTTPS**:
 
 ```bash
 python https_server.py
 ```
 
-The application will be available at:
-
+La aplicación estará disponible en:
 - `https://localhost:9099` (Local)
-- `https://YOUR_IP:9099` (Local network/Tailscale)
+- `https://TU_IP:9099` (Red local/Tailscale)
 
-**Important note**: When using self-signed certificates, your browser will display a security warning. Click "Advanced" and "Proceed to site" to continue. This is normal in development environments.
+**Nota importante**: Al usar certificados autofirmados, tu navegador mostrará una advertencia de seguridad. Haz clic en "Avanzado" y "Proceder al sitio" para continuar. Esto es normal en entornos de desarrollo.
 
-### Option 2: HTTP (For local development only)
+### Opción 2: HTTP (Solo para desarrollo local)
 
 ```bash
 cd backend
 python -m uvicorn main:app --reload --port 9099
 ```
 
-The application will be available at `http://localhost:9099`
+La aplicación estará disponible en `http://localhost:9099`
 
-**⚠️ Warning**: Moodle may require HTTPS for LTI integration in some environments.
+**⚠️ Advertencia**: Moodle puede requerir HTTPS para la integración LTI en algunos entornos.
 
-## Moodle Configuration
+## Configuración en Moodle
 
-### 1. Add LTI External Tool
+### 1. Añadir herramienta externa LTI
 
-1. Go to `Site administration` > `Plugins` > `Activities` > `External tool` > `Manage tools`
-2. Click `Configure a tool manually`
-3. Configure:
-   - **Tool name**: LAMBA
-   - **Tool URL**: `https://your-server:9099/lti` (or `https://localhost:9099/lti` for local development)
-   - **LTI version**: LTI 1.0/1.1
-   - **Consumer key**: The value of `OAUTH_CONSUMER_KEY` from your `.env`
-   - **Shared secret**: The value of `LTI_SECRET` from your `.env`
-   - **Default launch container**: New window
-   - **⚠️ Important**: Use `https://` in the URL
+1. Ve a `Administración del sitio` > `Plugins` > `Actividades` > `Herramienta externa` > `Gestionar herramientas`
+2. Haz clic en `Configurar una herramienta manualmente`
+3. Configura:
+   - **Nombre de la herramienta**: LAMBA
+   - **URL de la herramienta**: `https://tu-servidor:9099/lti` (o `https://localhost:9099/lti` para desarrollo local)
+   - **Versión LTI**: LTI 1.0/1.1
+   - **Clave de consumidor**: El valor de `OAUTH_CONSUMER_KEY` de tu `.env`
+   - **Secreto compartido**: El valor de `LTI_SECRET` de tu `.env`
+   - **Contenedor de lanzamiento predeterminado**: Nueva ventana
+   - **⚠️ Importante**: Usa `https://` en la URL
 
-4. Under **Privacy**:
-   - ✅ Share launcher's name with tool: Always
-   - ✅ Share launcher's email with tool: Always
-   - ✅ Accept grades from the tool: Always
+4. En **Privacidad**:
+   - ✅ Compartir el nombre del lanzador con la herramienta: Siempre
+   - ✅ Compartir el correo del lanzador con la herramienta: Siempre
+   - ✅ Aceptar calificaciones de la herramienta: Siempre
 
-5. Under **Services**:
+5. En **Servicios**:
    - ✅ IMS LTI Assignment and Grade Services
    - ✅ IMS LTI Names and Role Provisioning
    - ✅ Tool Settings
 
-### 2. Create Activities in Moodle
+### 2. Crear actividades en Moodle
 
-1. In your course, add a new activity of type **External tool**
-2. Select **LAMBA** as the preconfigured tool
-3. **Important**: The activity name in Moodle must match the activity title in LAMBA
-4. Configure grading:
-   - ✅ Allow LAMBA to add grades to the gradebook
-   - **Grade type**: Point
-   - **Maximum grade**: 10
-   - **Grade to pass**: 5.00
+1. En tu curso, añade una nueva actividad de tipo **Herramienta externa**
+2. Selecciona **LAMBA** como herramienta preconfigurada
+3. **Importante**: El nombre de la actividad en Moodle debe coincidir con el título de la actividad en LAMBA
+4. Configura las calificaciones:
+   - ✅ Permitir que LAMBA añada calificaciones al libro de calificaciones
+   - **Tipo de calificación**: Puntuación
+   - **Calificación máxima**: 10
+   - **Calificación para aprobar**: 5.00
 
-## Project Structure
+## Estructura del proyecto
 
 ```
 .
 ├── backend/
-│   ├── main.py                   # Application entry point
-│   ├── https_server.py           # HTTPS server for production
-│   ├── generate_ssl_cert.py      # Script to generate SSL certificates
-│   ├── config.py                 # Configuration and environment variables
-│   ├── database.py               # Database configuration
-│   ├── db_models.py              # Database models (SQLAlchemy)
-│   ├── models.py                 # Pydantic models for API
-│   ├── activities_router.py      # Activities endpoints
-│   ├── activities_service.py     # Activities business logic
-│   ├── admin_router.py           # Administration endpoints
-│   ├── admin_service.py          # Administration service
-│   ├── submissions_router.py     # Submissions endpoints
-│   ├── grades_router.py          # Grades endpoints
-│   ├── grade_service.py          # Grades service
-│   ├── lti_service.py            # LTI service for grade submission
-│   ├── lamb_api_service.py       # LAMB API integration
-│   ├── storage_service.py        # Uploaded files management
-│   ├── user_service.py           # Users business logic
-│   ├── course_service.py         # Courses business logic
-│   ├── moodle_service.py         # Moodle business logic
-│   ├── document_extractor.py     # Document text extraction
-│   ├── requirements.txt          # Python dependencies
-│   ├── API_DOCUMENTATION.md      # Complete API documentation
-│   └── ssl/                      # SSL certificates (generated)
+│   ├── main.py                   # Punto de entrada de la aplicación
+│   ├── https_server.py           # Servidor HTTPS para producción
+│   ├── generate_ssl_cert.py      # Script para generar certificados SSL
+│   ├── config.py                 # Configuración y variables de entorno
+│   ├── database.py               # Configuración de base de datos
+│   ├── db_models.py              # Modelos de base de datos (SQLAlchemy)
+│   ├── models.py                 # Modelos Pydantic para API
+│   ├── activities_router.py      # Endpoints de actividades
+│   ├── activities_service.py     # Lógica de negocio de actividades
+│   ├── admin_router.py           # Endpoints de administración
+│   ├── admin_service.py          # Servicio de administración
+│   ├── submissions_router.py     # Endpoints de entregas
+│   ├── grades_router.py          # Endpoints de calificaciones
+│   ├── grade_service.py          # Servicio de calificaciones
+│   ├── lti_service.py            # Servicio LTI para envío de notas
+│   ├── lamb_api_service.py       # Integración con API LAMB
+│   ├── storage_service.py        # Gestión de archivos subidos
+│   ├── user_service.py           # Lógica de negocio de usuarios
+│   ├── course_service.py         # Lógica de negocio de cursos
+│   ├── moodle_service.py         # Lógica de negocio de Moodle
+│   ├── document_extractor.py     # Extracción de texto de documentos
+│   ├── requirements.txt          # Dependencias Python
+│   ├── API_DOCUMENTATION.md      # Documentación completa de la API
+│   └── ssl/                      # Certificados SSL (generados)
 │
 └── frontend/svelte-app/
     ├── src/
     │   ├── routes/
-    │   │   ├── +page.svelte                # Main page
-    │   │   ├── +layout.svelte              # Root layout
-    │   │   ├── +layout.js                  # Routes configuration
+    │   │   ├── +page.svelte                # Página principal
+    │   │   ├── +layout.svelte              # Layout raíz
+    │   │   ├── +layout.js                  # Configuración de rutas
     │   │   ├── actividad/
     │   │   │   └── [activityId]/
-    │   │   │       └── +page.svelte        # Specific activity view
+    │   │   │       └── +page.svelte        # Vista de actividad específica
     │   │   └── admin/
-    │   │       ├── +page.svelte            # Admin login page
-    │   │       ├── +layout.svelte          # Admin layout
+    │   │       ├── +page.svelte            # Página de login admin
+    │   │       ├── +layout.svelte          # Layout admin
     │   │       └── dashboard/
-    │   │           ├── +page.svelte        # Admin main dashboard
-    │   │           ├── activities/         # Activities management
-    │   │           ├── users/              # Users management
-    │   │           ├── submissions/        # Submissions management
-    │   │           ├── grades/             # Grades management
-    │   │           ├── courses/            # Courses management
-    │   │           ├── files/              # Files management
-    │   │           └── moodle/             # Moodle configuration
+    │   │           ├── +page.svelte        # Dashboard principal admin
+    │   │           ├── activities/         # Gestión de actividades
+    │   │           ├── users/              # Gestión de usuarios
+    │   │           ├── submissions/        # Gestión de entregas
+    │   │           ├── grades/             # Gestión de calificaciones
+    │   │           ├── courses/            # Gestión de cursos
+    │   │           ├── files/              # Gestión de archivos
+    │   │           └── moodle/             # Configuración Moodle
     │   ├── lib/
-    │   │   ├── auth.js                     # LTI authentication
-    │   │   ├── admin.js                    # Administration logic
+    │   │   ├── auth.js                     # Autenticación LTI
+    │   │   ├── admin.js                    # Lógica de administración
     │   │   ├── components/
-    │   │   │   ├── Nav.svelte              # Main navigation
-    │   │   │   ├── AdminNav.svelte         # Admin navigation
-    │   │   │   ├── ActivityForm.svelte     # Activities form
-    │   │   │   ├── DataTable.svelte        # Reusable data table
-    │   │   │   └── LanguageSelector.svelte # Language selector
+    │   │   │   ├── Nav.svelte              # Navegación principal
+    │   │   │   ├── AdminNav.svelte         # Navegación admin
+    │   │   │   ├── ActivityForm.svelte     # Formulario de actividades
+    │   │   │   ├── DataTable.svelte        # Tabla de datos reutilizable
+    │   │   │   └── LanguageSelector.svelte # Selector de idioma
     │   │   └── i18n/
-    │   │       ├── index.js                # i18n configuration
-    │   │       ├── formatters.js           # Data formatters
+    │   │       ├── index.js                # Configuración i18n
+    │   │       ├── formatters.js           # Formateadores de datos
     │   │       └── locales/
-    │   │           ├── ca.json             # Catalan
-    │   │           ├── es.json             # Spanish
-    │   │           └── en.json             # English
-    │   ├── app.html                        # Root HTML
-    │   ├── app.css                         # Global styles
-    │   ├── app.d.ts                        # TypeScript types
+    │   │           ├── ca.json             # Catalán
+    │   │           ├── es.json             # Español
+    │   │           └── en.json             # Inglés
+    │   ├── app.html                        # HTML raíz
+    │   ├── app.css                         # Estilos globales
+    │   ├── app.d.ts                        # Tipos TypeScript
     │   └── tests/                          # Tests
     ├── package.json
-    ├── svelte.config.js                    # Svelte configuration
-    ├── vite.config.js                      # Vite configuration
-    ├── vitest.config.js                    # Vitest configuration
-    ├── eslint.config.js                    # ESLint configuration
-    ├── jsconfig.json                       # JavaScript configuration
+    ├── svelte.config.js                    # Configuración Svelte
+    ├── vite.config.js                      # Configuración Vite
+    ├── vitest.config.js                    # Configuración Vitest
+    ├── eslint.config.js                    # Configuración ESLint
+    ├── jsconfig.json                       # Configuración JavaScript
     └── static/
-        ├── config.js                       # Frontend configuration
-        └── img/                            # Static images
+        ├── config.js                       # Configuración frontend
+        └── img/                            # Imágenes estáticas
+
 ```
 
-## Usage
+## Uso
 
-### For Administrators
+### Para administradores
 
-1. Access LAMBA as administrator at `https://localhost:9099/admin`
-2. Log in with the credentials configured in `.env`:
-   - Username: `ADMIN_USERNAME`
-   - Password: `ADMIN_PASSWORD`
-3. In the administration panel you can:
-   - **Manage activities**: View, create, edit, and delete activities
-   - **Manage users**: View registered user information
-   - **View submissions**: Monitor all student submissions
-   - **Manage grades**: Review and send grades to Moodle
-   - **Configure LAMB evaluators**: Associate AI evaluators with activities
+1. Accede a LAMBA como administrador en `https://localhost:9099/admin`
+2. Inicia sesión con las credenciales configuradas en `.env`:
+   - Usuario: `ADMIN_USERNAME`
+   - Contraseña: `ADMIN_PASSWORD`
+3. En el panel de administración puedes:
+   - **Gestionar actividades**: Ver, crear, editar y eliminar actividades
+   - **Gestionar usuarios**: Ver información de usuarios registrados
+   - **Ver entregas**: Monitorizar todas las entregas de estudiantes
+   - **Gestionar calificaciones**: Revisar y enviar calificaciones a Moodle
+   - **Configurar evaluadores LAMB**: Asociar evaluadores de IA a actividades
 
-### For Teachers
+### Para profesores
 
-1. Access LAMBA from Moodle
-2. Create a new activity specifying:
-   - Title
-   - Description
-   - Type (individual or group)
-   - Deadline (optional)
-   - LAMB evaluator ID (optional, for automatic assessment)
-3. Students will be able to view and submit the activity
-4. Review submissions, evaluate (manually or automatically), and send grades to Moodle
+1. Accede a LAMBA desde Moodle
+2. Crea una nueva actividad especificando:
+   - Título
+   - Descripción
+   - Tipo (individual o grupal)
+   - Fecha límite (opcional)
+   - ID del evaluador LAMB (opcional, para evaluación automática)
+3. Los estudiantes podrán ver y entregar la actividad
+4. Revisa las entregas, evalúa (manual o automáticamente) y envía las calificaciones a Moodle
 
-### For Students
+### Para estudiantes
 
-1. Access the activity from Moodle
-2. Read the activity description
-3. Upload your document (individual) or join a group with a shared code
-4. Wait for the teacher's evaluation
-5. Your grade will be automatically sent to Moodle
+1. Accede a la actividad desde Moodle
+2. Lee la descripción de la actividad
+3. Sube tu documento (individual) o únete a un grupo con un código compartido
+4. Espera la evaluación del profesor
+5. Tu calificación se enviará automáticamente a Moodle
 
-## Technologies Used
+## Tecnologías utilizadas
 
 ### Backend
-
-- **FastAPI**: Modern and fast web framework
-- **SQLAlchemy**: ORM for database management
-- **SQLite**: Database (easily replaceable with PostgreSQL/MySQL)
-- **Requests**: HTTP client for LAMB API communication
-- **PyLTI**: LTI 1.1 implementation
-- **Cryptography**: SSL certificate generation
+- **FastAPI**: Framework web moderno y rápido
+- **SQLAlchemy**: ORM para gestión de base de datos
+- **SQLite**: Base de datos (fácilmente reemplazable por PostgreSQL/MySQL)
+- **Requests**: Cliente HTTP para comunicación con API LAMB
+- **PyLTI**: Implementación de LTI 1.1
+- **Cryptography**: Generación de certificados SSL
 
 ### Frontend
+- **SvelteKit**: Framework de aplicaciones web
+- **Svelte 5**: Biblioteca UI reactiva
+- **Tailwind CSS**: Framework CSS utility-first
+- **svelte-i18n**: Internacionalización
 
-- **SvelteKit**: Web application framework
-- **Svelte 5**: Reactive UI library
-- **Tailwind CSS**: Utility-first CSS framework
-- **svelte-i18n**: Internationalization
+## Solución de problemas
 
-## Troubleshooting
+### Certificados SSL
 
-### SSL Certificates
+**Problema**: El navegador no confía en el certificado autofirmado
 
-**Problem**: The browser doesn't trust the self-signed certificate
+**Solución**:
+1. Haz clic en "Avanzado" o "Advanced" en la advertencia del navegador
+2. Selecciona "Proceder a localhost (no seguro)" o similar
+3. Para Chrome/Edge: escribe `thisisunsafe` cuando veas la advertencia (sin ningún campo de texto visible)
 
-**Solution**:
-
-1. Click "Advanced" in the browser warning
-2. Select "Proceed to localhost (unsafe)" or similar
-3. For Chrome/Edge: type `thisisunsafe` when you see the warning (without any visible text field)
-
-**Alternative**: Generate new certificates if the current ones have expired:
-
+**Alternativa**: Genera nuevos certificados si los actuales han expirado:
 ```bash
 cd backend
 python generate_ssl_cert.py
 ```
 
-### Moodle Connection Error
+### Error de conexión con Moodle
 
-**Problem**: Moodle cannot connect to LAMBA
+**Problema**: Moodle no puede conectarse a LAMBA
 
-**Solution**:
+**Solución**:
+1. Verifica que la URL en Moodle use `https://` y el puerto correcto (9099)
+2. Asegúrate de que el firewall permita conexiones al puerto 9099
+3. Si usas Tailscale u otra VPN, usa la IP de la red virtual
+4. Verifica que `OAUTH_CONSUMER_KEY` y `LTI_SECRET` coincidan entre Moodle y `.env`
 
-1. Verify that the URL in Moodle uses `https://` and the correct port (9099)
-2. Make sure the firewall allows connections to port 9099
-3. If using Tailscale or another VPN, use the virtual network IP
-4. Verify that `OAUTH_CONSUMER_KEY` and `LTI_SECRET` match between Moodle and `.env`
+### La evaluación automática no funciona
 
-### Automatic Assessment Not Working
+**Problema**: Error al evaluar con LAMB
 
-**Problem**: Error when evaluating with LAMB
+**Solución**:
+1. Verifica que `LAMB_API_URL` y `LAMB_BEARER_TOKEN` sean correctos en `.env`
+2. Asegúrate de que el `evaluator_id` configurado en la actividad exista en LAMB
+3. Verifica que los documentos subidos sean PDF, DOCX o TXT (formatos soportados)
 
-**Solution**:
+### Las calificaciones no se envían a Moodle
 
-1. Verify that `LAMB_API_URL` and `LAMB_BEARER_TOKEN` are correct in `.env`
-2. Make sure the `evaluator_id` configured in the activity exists in LAMB
-3. Verify that uploaded documents are PDF, DOCX, or TXT (supported formats)
+**Problema**: Error al sincronizar calificaciones
 
-### Grades Not Being Sent to Moodle
+**Solución**:
+1. Verifica que la actividad en Moodle tenga activada la opción "Aceptar calificaciones de la herramienta"
+2. Asegúrate de que la calificación máxima en Moodle sea 10
+3. Comprueba que los estudiantes accedieron a la actividad desde Moodle (necesario para obtener `lis_result_sourcedid`)
 
-**Problem**: Error when synchronizing grades
+## Documentación adicional
 
-**Solution**:
+- **API Documentation**: Ver `backend/API_DOCUMENTATION.md` para documentación completa de todos los endpoints
+- **Swagger UI**: Disponible en `https://localhost:9099/docs` cuando el servidor está corriendo
+- **ReDoc**: Disponible en `https://localhost:9099/redoc` para una vista alternativa de la API
 
-1. Verify that the activity in Moodle has the "Accept grades from the tool" option enabled
-2. Make sure the maximum grade in Moodle is 10
-3. Check that students accessed the activity from Moodle (required to obtain `lis_result_sourcedid`)
+## Licencia
 
-## Additional Documentation
-
-- **API Documentation**: See `backend/API_DOCUMENTATION.md` for complete documentation of all endpoints
-- **Swagger UI**: Available at `https://localhost:9099/docs` when the server is running
-- **ReDoc**: Available at `https://localhost:9099/redoc` for an alternative API view
-
-## License
-
-LAMB is licensed under the GNU General Public License v3.0 (GPL v3).
-
-Copyright (c) 2025-2026 Arnau Tajahuerce @ArnauTajahuerce, Marc Alier @granludo (UPC), Maria José Casañ (UPC), Juanan Pereira (UPV/EHU) @juananpe
-
-See [LICENSE](https://github.com/Lamb-Project/lamb/blob/main/LICENSE) for full details.
+Este proyecto es un Trabajo de Fin de Grado desarrollado por Arnau Tajahuerce Brulles.
