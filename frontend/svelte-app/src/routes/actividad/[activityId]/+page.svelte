@@ -419,7 +419,7 @@
           
           // Validate score
           if (isNaN(score) || score < 0 || score > 10) {
-            saveGradesError = `La nota para una de las entregas debe estar entre 0 y 10`;
+            saveGradesError = $_('activity.grading.invalidScore');
             return;
           }
           
@@ -465,9 +465,10 @@
       
       // Show results
       if (savedCount > 0) {
-        saveGradesSuccess = `Se guardaron ${savedCount} calificación(es) correctamente`;
         if (failedCount > 0) {
-          saveGradesSuccess += ` (${failedCount} fallidas)`;
+          saveGradesSuccess = $_('activity.grading.savedWithErrors', { values: { saved: savedCount, failed: failedCount } });
+        } else {
+          saveGradesSuccess = $_('activity.grading.saved', { values: { count: savedCount } });
         }
         
         // Reload submissions to show updated grades

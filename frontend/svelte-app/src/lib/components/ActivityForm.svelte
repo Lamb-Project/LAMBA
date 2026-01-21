@@ -122,12 +122,12 @@
         });
       } else {
         dispatch('error', {
-          message: result.detail || 'Error al crear la actividad'
+          message: result.detail || $_('errors.connectionError')
         });
       }
     } catch (error) {
       dispatch('error', {
-        message: 'Error de conexión. Intenta de nuevo.'
+        message: $_('errors.connectionError')
       });
     } finally {
       isSubmitting = false;

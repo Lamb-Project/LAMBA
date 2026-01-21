@@ -5,9 +5,10 @@
   let isOpen = $state(false);
   
   const languages = [
-    { code: 'ca', name: 'Català', shortName: 'CA' },
+    { code: 'en', name: 'English', shortName: 'EN' },
     { code: 'es', name: 'Español', shortName: 'ES' },
-    { code: 'en', name: 'English', shortName: 'EN' }
+    { code: 'ca', name: 'Català', shortName: 'CA' },
+    { code: 'eu', name: 'Euskara', shortName: 'EU' }
   ];
   
   function toggleDropdown() {
@@ -34,7 +35,7 @@
     }
   });
   
-  let currentLanguage = $derived(languages.find(lang => lang.code === $locale) || languages[1]);
+  let currentLanguage = $derived(languages.find(lang => lang.code === $locale) || languages[0]);
 </script>
 
 <div class="language-selector relative inline-block">

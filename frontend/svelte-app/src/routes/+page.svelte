@@ -442,7 +442,7 @@
                     {/if}
                     <div class="mt-2 pt-2 border-t border-[#2271b3]/20">
                       <p class="text-xs text-[#2271b3]">
-                        Calificación enviada a Moodle el {formatDate(studentView.student_submission.student_submission.sent_to_moodle_at)}
+                        {$_('activity.student.gradeSentToMoodle', { values: { date: formatDate(studentView.student_submission.student_submission.sent_to_moodle_at) } })}
                       </p>
                     </div>
                   </div>

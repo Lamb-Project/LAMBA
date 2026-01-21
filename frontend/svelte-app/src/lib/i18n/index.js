@@ -1,18 +1,24 @@
 import { register, init, getLocaleFromNavigator, locale, waitLocale } from 'svelte-i18n';
 
 // Register translations
+register('en', () => import('./locales/en.json'));
 register('es', () => import('./locales/es.json'));
 register('ca', () => import('./locales/ca.json'));
-register('en', () => import('./locales/en.json'));
+register('eu', () => import('./locales/eu.json'));
 
 // Initialize i18n
 export async function initI18n() {
-  // Get stored locale or default to browser/Spanish
+  // Get stored locale or default to browser/English
   const storedLocale = typeof window !== 'undefined' ? localStorage.getItem('locale') : null;
-  const fallbackLocale = storedLocale || getLocaleFromNavigator() || 'es';
+  const browserLocale = getLocaleFromNavigator();
+  // Map browser locale to supported locales
+  const supportedLocales = ['en', 'es', 'ca', 'eu'];
+  const shortBrowserLocale = browserLocale?.split('-')[0];
+  const detectedLocale = supportedLocales.includes(shortBrowserLocale) ? shortBrowserLocale : 'en';
+  const fallbackLocale = storedLocale || detectedLocale;
   
   await init({
-    fallbackLocale: 'es',
+    fallbackLocale: 'en',
     initialLocale: fallbackLocale,
   });
   
