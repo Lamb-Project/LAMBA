@@ -220,12 +220,16 @@ async def process_lti_launch(request: Request):
         response = RedirectResponse(url=redirect_url, status_code=303)
         
         is_https = os.getenv("HTTPS_ENABLED", "false").lower() == "true"
+        # For LTI in iframes, we need SameSite=None to allow cross-site cookies
+        # SameSite=None requires Secure=True (HTTPS)
+        # If not using HTTPS, fall back to Lax (will have issues in iframes)
+        samesite_policy = "none" if is_https else "lax"
         response.set_cookie(
             key="lti_session",
             value=session_id,
             httponly=True,
             secure=is_https,
-            samesite="lax",
+            samesite=samesite_policy,
             max_age=3600
         )
         
@@ -241,7 +245,13 @@ async def get_current_session_data(request: Request):
     try:
         session_id = request.cookies.get("lti_session")
         
+        # Debug logging for cookie issues
+        logging.debug(f"Request cookies: {request.cookies}")
+        logging.debug(f"Session ID from cookie: {session_id}")
+        logging.debug(f"Available sessions in store: {list(lti_data_store.keys())}")
+        
         if not session_id:
+            logging.warning("No lti_session cookie found in request")
             raise HTTPException(status_code=401, detail="No se encontró sesión LTI activa")
         
         if session_id not in lti_data_store:
