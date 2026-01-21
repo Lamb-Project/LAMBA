@@ -8,8 +8,18 @@ from activities_service import ActivitiesService
 router = APIRouter()
 
 def get_lti_session_data(request: Request) -> dict:
-    """Get LTI data from session cookie"""
+    """Get LTI data from session cookie, header, or query param (for iframe compatibility)"""
+    # Try cookie first
     session_id = request.cookies.get("lti_session")
+    
+    # Try X-LTI-Session header (for API calls from frontend with sessionStorage fallback)
+    if not session_id:
+        session_id = request.headers.get("X-LTI-Session")
+    
+    # Try query parameter (last resort)
+    if not session_id:
+        session_id = request.query_params.get("lti_session")
+    
     if not session_id:
         raise HTTPException(status_code=401, detail="No se encontró sesión LTI activa")
     

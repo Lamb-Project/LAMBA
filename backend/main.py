@@ -217,7 +217,12 @@ async def process_lti_launch(request: Request):
                 except Exception as e:
                     logging.error(f"Error verificando existencia de actividad: {str(e)}")
                     redirect_url = "/"
-        response = RedirectResponse(url=redirect_url, status_code=303)
+        # Add session_id to redirect URL as fallback for iframe cookie issues
+        # This allows the frontend to capture it and use sessionStorage
+        separator = "&" if "?" in redirect_url else "?"
+        redirect_url_with_session = f"{redirect_url}{separator}lti_session={session_id}"
+        
+        response = RedirectResponse(url=redirect_url_with_session, status_code=303)
         
         is_https = os.getenv("HTTPS_ENABLED", "false").lower() == "true"
         # For LTI in iframes, we need SameSite=None to allow cross-site cookies
@@ -239,19 +244,36 @@ async def process_lti_launch(request: Request):
         logging.error(f"Error procesando lanzamiento LTI: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error procesando lanzamiento LTI: {str(e)}")
 
+def get_session_id_from_request(request: Request) -> str | None:
+    """Extract session ID from cookie, header, or query param (fallback for iframe issues)"""
+    # Try cookie first
+    session_id = request.cookies.get("lti_session")
+    if session_id:
+        return session_id
+    
+    # Try X-LTI-Session header (for API calls from frontend)
+    session_id = request.headers.get("X-LTI-Session")
+    if session_id:
+        return session_id
+    
+    # Try query parameter (last resort)
+    session_id = request.query_params.get("lti_session")
+    return session_id
+
 @app.get("/api/lti-data")
 async def get_current_session_data(request: Request):
     """Obtiene los datos LTI de la sesión actual"""
     try:
-        session_id = request.cookies.get("lti_session")
+        session_id = get_session_id_from_request(request)
         
-        # Debug logging for cookie issues
+        # Debug logging for session issues
         logging.debug(f"Request cookies: {request.cookies}")
-        logging.debug(f"Session ID from cookie: {session_id}")
+        logging.debug(f"X-LTI-Session header: {request.headers.get('X-LTI-Session')}")
+        logging.debug(f"Session ID resolved: {session_id}")
         logging.debug(f"Available sessions in store: {list(lti_data_store.keys())}")
         
         if not session_id:
-            logging.warning("No lti_session cookie found in request")
+            logging.warning("No lti_session found in cookie, header, or query param")
             raise HTTPException(status_code=401, detail="No se encontró sesión LTI activa")
         
         if session_id not in lti_data_store:
@@ -272,7 +294,7 @@ async def get_current_session_data(request: Request):
 async def download_file(file_path: str, request: Request):
     """Descarga archivos subidos (solo para profesores/administradores)"""
     try:
-        session_id = request.cookies.get("lti_session")
+        session_id = get_session_id_from_request(request)
         if not session_id:
             raise HTTPException(status_code=401, detail="No se encontró sesión LTI activa")
         

@@ -5,6 +5,7 @@
 	import { initI18n, locale } from '$lib/i18n';
 	import { isLoading } from 'svelte-i18n';
 	import { page } from '$app/stores';
+	import { initLTISession, ltiAwareFetch } from '$lib/auth.js';
 
 	let { children } = $props();
 	let ltiData = $state(null);
@@ -12,6 +13,11 @@
 
 	// Check if we're in admin routes
 	let isAdminRoute = $derived($page.url.pathname.startsWith('/admin'));
+
+	// Initialize LTI session from URL (for iframe cookie fallback)
+	onMount(() => {
+		initLTISession();
+	});
 
 	// Initialize i18n before mounting
 	onMount(async () => {
@@ -34,9 +40,7 @@
 		}
 		
 		try {
-			const response = await fetch('/api/lti-data', {
-				credentials: 'include'
-			});
+			const response = await ltiAwareFetch('/api/lti-data');
 			
 			if (response.ok) {
 				const result = await response.json();

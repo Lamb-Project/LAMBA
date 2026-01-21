@@ -4,6 +4,7 @@
   import { browser } from '$app/environment';
   import { _ } from 'svelte-i18n';
   import { formatDate, formatFileSize, formatDateForInput } from '$lib/i18n/formatters.js';
+  import { ltiAwareFetch } from '$lib/auth.js';
   
   let submissionsData = $state(null);
   let loading = $state(true);
@@ -50,9 +51,7 @@
       loading = true;
       error = null;
       
-      const response = await fetch(`/api/activities/${activityId}/submissions`, {
-        credentials: 'include'
-      });
+      const response = await ltiAwareFetch(`/api/activities/${activityId}/submissions`);
       
       if (!response.ok) {
         if (response.status === 403) {
@@ -127,9 +126,8 @@
       sendingGrades = true;
       gradesSentMessage = null;
       
-      const response = await fetch(`/api/activities/${activityId}/grades/sync`, {
-        method: 'POST',
-        credentials: 'include'
+      const response = await ltiAwareFetch(`/api/activities/${activityId}/grades/sync`, {
+        method: 'POST'
       });
       
       const result = await response.json();
@@ -195,12 +193,11 @@
         return;
       }
       
-      const response = await fetch(`/api/activities/${activityId}/evaluate`, {
+      const response = await ltiAwareFetch(`/api/activities/${activityId}/evaluate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           file_submission_ids: selectedSubmissions
         })
@@ -306,12 +303,11 @@
       updatingDescription = true;
       descriptionSaveStatus = 'saving';
       
-      const response = await fetch(`/api/activities/${activityId}`, {
+      const response = await ltiAwareFetch(`/api/activities/${activityId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           description: editedDescription.trim()
         })
@@ -364,12 +360,11 @@
       // Convert to ISO string or null
       const deadlineToSave = deadlineValue ? new Date(deadlineValue).toISOString() : null;
       
-      const response = await fetch(`/api/activities/${activityId}`, {
+      const response = await ltiAwareFetch(`/api/activities/${activityId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           deadline: deadlineToSave
         })
@@ -447,10 +442,9 @@
       
       for (const gradeRequest of gradesToSave) {
         try {
-          const response = await fetch(`/api/grades/${gradeRequest.file_submission_id}`, {
+          const response = await ltiAwareFetch(`/api/grades/${gradeRequest.file_submission_id}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({
               score: gradeRequest.score,
               comment: gradeRequest.comment
@@ -515,12 +509,11 @@
       updatingEvaluator = true;
       evaluatorSaveStatus = 'saving';
       
-      const response = await fetch(`/api/activities/${activityId}`, {
+      const response = await ltiAwareFetch(`/api/activities/${activityId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           evaluator_id: evaluatorIdValue.trim() || null
         })

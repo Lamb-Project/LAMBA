@@ -2,7 +2,7 @@
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { fetchLTIData, isStudentRole, isTeacherOrAdminRole } from '$lib/auth.js';
+  import { fetchLTIData, isStudentRole, isTeacherOrAdminRole, ltiAwareFetch } from '$lib/auth.js';
   import ActivityForm from '$lib/components/ActivityForm.svelte';
   import { _ } from 'svelte-i18n';
   import { formatDate, formatFileSize } from '$lib/i18n/formatters.js';
@@ -68,13 +68,11 @@
     try {
       loading = true;
       // Obtener el activity_id de los datos LTI
-      const ltiResponse = await fetch('/api/lti-data', { credentials: 'include' });
+      const ltiResponse = await ltiAwareFetch('/api/lti-data');
       const ltiData = await ltiResponse.json();
       const activityId = ltiData.data.resource_link_id;
       
-      const response = await fetch(`/api/activities/${activityId}/view`, {
-				credentials: 'include'
-			});
+      const response = await ltiAwareFetch(`/api/activities/${activityId}/view`);
 			
 			if (!response.ok) {
         if (response.status === 400) {
@@ -131,10 +129,9 @@
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetch(`/api/activities/${studentView.activity.id}/submissions`, {
+      const response = await ltiAwareFetch(`/api/activities/${studentView.activity.id}/submissions`, {
         method: 'POST',
-        body: formData,
-        credentials: 'include'
+        body: formData
       });
 
       const result = await response.json();
@@ -170,7 +167,7 @@
       codeError = null;
       codeSuccess = null;
 
-      const response = await fetch('/api/submissions/join', {
+      const response = await ltiAwareFetch('/api/submissions/join', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -178,8 +175,7 @@
         body: JSON.stringify({
           activity_id: studentView.activity.id,
           group_code: groupCode.trim().toUpperCase()
-        }),
-        credentials: 'include'
+        })
       });
 
       const result = await response.json();
@@ -206,9 +202,7 @@
     
     try {
       const submissionId = studentView.student_submission.file_submission.id;
-      const response = await fetch(`/api/submissions/${submissionId}/members`, {
-        credentials: 'include'
-      });
+      const response = await ltiAwareFetch(`/api/submissions/${submissionId}/members`);
 
       if (response.ok) {
         const result = await response.json();

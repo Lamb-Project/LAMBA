@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import { ltiAwareFetch } from '$lib/auth.js';
   
   const dispatch = createEventDispatcher();
   
@@ -94,12 +95,11 @@
         evaluator_id: evaluatorId.trim() || null
       };
       
-      const response = await fetch('/api/activities', {
+      const response = await ltiAwareFetch('/api/activities', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify(activityData)
       });
       

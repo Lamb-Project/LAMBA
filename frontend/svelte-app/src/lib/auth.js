@@ -1,5 +1,72 @@
 // Authentication and authorization utilities
 
+const LTI_SESSION_KEY = 'lti_session';
+
+/**
+ * Initialize LTI session from URL parameter (fallback for iframe cookie issues)
+ * Should be called on app startup
+ */
+export function initLTISession() {
+  if (typeof window === 'undefined') return;
+  
+  // Check if there's a session ID in the URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionFromUrl = urlParams.get('lti_session');
+  
+  if (sessionFromUrl) {
+    // Store in sessionStorage for subsequent requests
+    sessionStorage.setItem(LTI_SESSION_KEY, sessionFromUrl);
+    
+    // Clean the URL by removing the lti_session parameter
+    urlParams.delete('lti_session');
+    const newSearch = urlParams.toString();
+    const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+    window.history.replaceState({}, '', newUrl);
+    
+    console.log('LTI session captured from URL and stored in sessionStorage');
+  }
+}
+
+/**
+ * Get the stored LTI session ID
+ * @returns {string|null}
+ */
+export function getLTISessionId() {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(LTI_SESSION_KEY);
+}
+
+/**
+ * Create fetch options with LTI session header
+ * @param {RequestInit} options - Original fetch options
+ * @returns {RequestInit} - Options with LTI session header added
+ */
+export function withLTISession(options = {}) {
+  const sessionId = getLTISessionId();
+  
+  const headers = new Headers(options.headers || {});
+  
+  if (sessionId) {
+    headers.set('X-LTI-Session', sessionId);
+  }
+  
+  return {
+    ...options,
+    credentials: 'include',
+    headers
+  };
+}
+
+/**
+ * Fetch wrapper that automatically includes LTI session
+ * @param {string} url - URL to fetch
+ * @param {RequestInit} options - Fetch options
+ * @returns {Promise<Response>}
+ */
+export async function ltiAwareFetch(url, options = {}) {
+  return fetch(url, withLTISession(options));
+}
+
 /**
  * Check if user has student role
  * @param {string} roles - LTI roles string
@@ -31,9 +98,7 @@ export function isTeacherOrAdminRole(roles) {
  */
 export async function fetchLTIData() {
   try {
-    const response = await fetch('/api/lti-data', {
-      credentials: 'include'
-    });
+    const response = await ltiAwareFetch('/api/lti-data');
     
     if (!response.ok) {
       return {
@@ -84,8 +149,7 @@ export async function checkPendingActivity() {
     
     // Check if the activity already exists
     try {
-      const response = await fetch(`/api/activities/${resourceLinkId}`, {
-        credentials: 'include',
+      const response = await ltiAwareFetch(`/api/activities/${resourceLinkId}`, {
         cache: 'no-cache' // Force fresh data
       });
       
