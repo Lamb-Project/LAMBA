@@ -350,3 +350,105 @@ async def get_grades(request: Request):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo calificaciones: {str(e)}")
+
+
+@router.get("/api/admin/debug/lamb")
+async def debug_lamb_connection(request: Request):
+    """
+    Debug endpoint to test LAMB API connection.
+    Requires valid admin session.
+    
+    Returns:
+        - 200: Debug information about LAMB API connection
+        - 401: Unauthorized
+    """
+    if not verify_admin_session(request):
+        raise HTTPException(status_code=401, detail="No autorizado")
+    
+    import requests
+    from lamb_api_service import LAMBAPIService
+    
+    debug_info = {
+        "config": {
+            "LAMB_API_URL": LAMBAPIService.LAMB_API_URL,
+            "LAMB_BEARER_TOKEN": LAMBAPIService.LAMB_BEARER_TOKEN[:10] + "..." if LAMBAPIService.LAMB_BEARER_TOKEN else None,
+            "LAMB_TIMEOUT": LAMBAPIService.LAMB_TIMEOUT
+        },
+        "tests": {}
+    }
+    
+    # Test 1: Basic connectivity
+    try:
+        url = f"{LAMBAPIService.LAMB_API_URL}/v1/models"
+        response = requests.get(url, timeout=10)
+        debug_info["tests"]["connectivity"] = {
+            "url": url,
+            "status_code": response.status_code,
+            "response_length": len(response.text) if response.text else 0,
+            "content_type": response.headers.get("content-type"),
+            "response_preview": response.text[:500] if response.text else "(empty)"
+        }
+        
+        # Try to parse JSON
+        try:
+            json_data = response.json()
+            debug_info["tests"]["connectivity"]["json_parsed"] = True
+            debug_info["tests"]["connectivity"]["json_keys"] = list(json_data.keys()) if isinstance(json_data, dict) else type(json_data).__name__
+            
+            # List available models
+            models = json_data.get("data", [])
+            debug_info["tests"]["connectivity"]["models_count"] = len(models)
+            debug_info["tests"]["connectivity"]["available_models"] = [m.get("id") for m in models[:20]]  # First 20
+        except Exception as json_err:
+            debug_info["tests"]["connectivity"]["json_parsed"] = False
+            debug_info["tests"]["connectivity"]["json_error"] = str(json_err)
+            
+    except requests.exceptions.Timeout:
+        debug_info["tests"]["connectivity"] = {"error": "Timeout connecting to LAMB API"}
+    except requests.exceptions.ConnectionError as e:
+        debug_info["tests"]["connectivity"] = {"error": f"Connection error: {str(e)}"}
+    except Exception as e:
+        debug_info["tests"]["connectivity"] = {"error": f"Unexpected error: {type(e).__name__}: {str(e)}"}
+    
+    return {
+        "success": True,
+        "debug_info": debug_info
+    }
+
+
+@router.post("/api/admin/debug/lamb/verify-model")
+async def debug_verify_lamb_model(request: Request):
+    """
+    Debug endpoint to verify a specific LAMB model.
+    Requires valid admin session.
+    
+    Body: { "evaluator_id": "xxx" }
+    
+    Returns:
+        - 200: Verification result
+        - 401: Unauthorized
+    """
+    if not verify_admin_session(request):
+        raise HTTPException(status_code=401, detail="No autorizado")
+    
+    from lamb_api_service import LAMBAPIService
+    
+    try:
+        body = await request.json()
+        evaluator_id = body.get("evaluator_id")
+        
+        if not evaluator_id:
+            raise HTTPException(status_code=400, detail="evaluator_id es requerido")
+        
+        result = LAMBAPIService.verify_model_exists(evaluator_id)
+        
+        return {
+            "success": True,
+            "evaluator_id": evaluator_id,
+            "model_id": f"lamb_assistant.{evaluator_id}",
+            "verification_result": result
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

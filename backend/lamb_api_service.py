@@ -20,21 +20,51 @@ class LAMBAPIService:
     @staticmethod
     def verify_model_exists(evaluator_id: str) -> Dict[str, Any]:
         """Verifica que existe un modelo LAMB con el evaluator_id dado"""
+        url = f"{LAMBAPIService.LAMB_API_URL}/v1/models"
+        logging.info(f"Verificando modelo LAMB en: {url}")
+        
         try:
-            response = requests.get(
-                f"{LAMBAPIService.LAMB_API_URL}/v1/models",
-                timeout=10
-            )
+            response = requests.get(url, timeout=10)
+            
+            logging.info(f"LAMB /v1/models response status: {response.status_code}")
+            logging.debug(f"LAMB /v1/models response headers: {dict(response.headers)}")
             
             if response.status_code != 200:
+                error_detail = ""
+                try:
+                    error_detail = f" - Respuesta: {response.text[:500]}" if response.text else ""
+                except:
+                    pass
                 return {
                     "success": False,
-                    "error": f"Error al conectar con el servidor LAMB (código {response.status_code})"
+                    "error": f"Error al conectar con el servidor LAMB (código {response.status_code}){error_detail}"
                 }
             
-            data = response.json()
+            # Log raw response for debugging
+            raw_text = response.text
+            logging.debug(f"LAMB /v1/models raw response (first 500 chars): {raw_text[:500] if raw_text else '(empty)'}")
+            
+            if not raw_text or not raw_text.strip():
+                return {
+                    "success": False,
+                    "error": f"El servidor LAMB retornó una respuesta vacía. URL: {url}"
+                }
+            
+            try:
+                data = response.json()
+            except Exception as json_err:
+                logging.error(f"Error parseando JSON de LAMB: {json_err}. Respuesta raw: {raw_text[:500]}")
+                return {
+                    "success": False,
+                    "error": f"El servidor LAMB retornó una respuesta no válida (no es JSON). Respuesta: {raw_text[:200]}"
+                }
+            
             models = data.get("data", [])
             model_id = f"lamb_assistant.{evaluator_id}"
+            
+            logging.info(f"Buscando modelo '{model_id}' entre {len(models)} modelos disponibles")
+            logging.debug(f"Modelos disponibles: {[m.get('id') for m in models]}")
+            
             model_found = any(model.get("id") == model_id for model in models)
             
             if model_found:
@@ -44,58 +74,85 @@ class LAMBAPIService:
                     "message": f"Modelo {model_id} encontrado correctamente"
                 }
             else:
+                available_models = [m.get('id') for m in models[:10]]  # Show first 10
                 return {
                     "success": False,
-                    "error": f"No se encontró el modelo '{model_id}' en el servidor LAMB"
+                    "error": f"No se encontró el modelo '{model_id}' en el servidor LAMB. Modelos disponibles: {available_models}"
                 }
                 
         except requests.exceptions.Timeout:
-            return {"success": False, "error": "Tiempo de espera agotado al conectar con el servidor LAMB"}
-        except requests.exceptions.ConnectionError:
-            return {"success": False, "error": "No se pudo conectar con el servidor LAMB"}
+            return {"success": False, "error": f"Tiempo de espera agotado al conectar con el servidor LAMB ({url})"}
+        except requests.exceptions.ConnectionError as e:
+            return {"success": False, "error": f"No se pudo conectar con el servidor LAMB ({url}): {str(e)}"}
         except Exception as e:
-            return {"success": False, "error": f"Error al verificar el modelo LAMB: {str(e)}"}
+            logging.exception(f"Error inesperado al verificar modelo LAMB")
+            return {"success": False, "error": f"Error al verificar el modelo LAMB: {type(e).__name__}: {str(e)}"}
     
     @staticmethod
     def evaluate_text(text: str, evaluator_id: str, timeout: Optional[int] = None) -> Dict[str, Any]:
         """Envía texto al modelo LAMB para evaluación"""
+        model_id = f"lamb_assistant.{evaluator_id}"
+        url = f"{LAMBAPIService.LAMB_API_URL}/chat/completions"
+        effective_timeout = timeout or LAMBAPIService.LAMB_TIMEOUT
+        
         try:
-            model_id = f"lamb_assistant.{evaluator_id}"
-            url = f"{LAMBAPIService.LAMB_API_URL}/chat/completions"
             headers = {
                 'Content-Type': 'application/json',
                 'Authorization': f"Bearer {LAMBAPIService.LAMB_BEARER_TOKEN}"
             }
             payload = {'model': model_id, 'prompt': text}
-            effective_timeout = timeout or LAMBAPIService.LAMB_TIMEOUT
             
             logging.info(f"Enviando solicitud de evaluación al modelo LAMB {model_id}")
+            logging.info(f"URL: {url}, Timeout: {effective_timeout}s, Text length: {len(text)} chars")
+            logging.debug(f"Headers: {headers}")
+            logging.debug(f"Payload model: {payload['model']}, prompt length: {len(payload['prompt'])}")
             
             response = requests.post(url, headers=headers, json=payload, timeout=effective_timeout)
             
+            logging.info(f"LAMB /chat/completions response status: {response.status_code}")
+            
             if response.status_code != 200:
+                raw_text = response.text[:500] if response.text else "(empty)"
                 error_msg = f"LAMB API retornó status {response.status_code}"
                 try:
-                    error_msg += f": {response.json()}"
+                    error_detail = response.json()
+                    error_msg += f": {error_detail}"
                 except:
-                    error_msg += f": {response.text}"
+                    error_msg += f": {raw_text}"
+                logging.error(error_msg)
+                return {'success': False, 'error': error_msg}
+            
+            # Check for empty response
+            raw_text = response.text
+            if not raw_text or not raw_text.strip():
+                error_msg = f"LAMB API retornó una respuesta vacía (status 200). URL: {url}"
+                logging.error(error_msg)
+                return {'success': False, 'error': error_msg}
+            
+            # Try to parse JSON
+            try:
+                response_json = response.json()
+            except Exception as json_err:
+                error_msg = f"LAMB API retornó respuesta no válida (no es JSON): {raw_text[:300]}"
                 logging.error(error_msg)
                 return {'success': False, 'error': error_msg}
             
             logging.info("Respuesta de evaluación recibida de LAMB")
-            return {'success': True, 'response': response.json(), 'model_id': model_id}
+            logging.debug(f"Response keys: {response_json.keys() if isinstance(response_json, dict) else type(response_json)}")
+            
+            return {'success': True, 'response': response_json, 'model_id': model_id}
             
         except requests.exceptions.Timeout:
-            error_msg = f"Timeout al conectar con LAMB API (> {effective_timeout}s)"
+            error_msg = f"Timeout al conectar con LAMB API (> {effective_timeout}s). URL: {url}"
             logging.error(error_msg)
             return {'success': False, 'error': error_msg}
-        except requests.exceptions.ConnectionError:
-            error_msg = "No se pudo conectar con LAMB API"
+        except requests.exceptions.ConnectionError as e:
+            error_msg = f"No se pudo conectar con LAMB API ({url}): {str(e)}"
             logging.error(error_msg)
             return {'success': False, 'error': error_msg}
         except Exception as e:
-            error_msg = f"Error inesperado al llamar a LAMB API: {str(e)}"
-            logging.error(error_msg)
+            error_msg = f"Error inesperado al llamar a LAMB API: {type(e).__name__}: {str(e)}"
+            logging.exception(error_msg)
             return {'success': False, 'error': error_msg}
     
     @staticmethod

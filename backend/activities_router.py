@@ -318,9 +318,19 @@ async def evaluate_activity(activity_id: str, request: Request):
         
     except HTTPException:
         raise
+    except ValueError as e:
+        # ValueError is used for validation errors (missing evaluator, model not found, etc.)
+        error_msg = str(e)
+        logging.error(f"Error de validación en evaluación automática: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
-        logging.error(f"Error en evaluación automática: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+        error_msg = str(e)
+        logging.error(f"Error en evaluación automática: {error_msg}")
+        # Provide more details for debugging
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error en la evaluación automática: {error_msg}. Verifica la configuración del servidor LAMB en /api/admin/debug/lamb"
+        )
 
 # ==================== Sincronización de Calificaciones ====================
 
