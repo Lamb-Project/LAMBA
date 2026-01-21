@@ -92,7 +92,7 @@
           <div class="text-right">
             <div class="flex items-center justify-end space-x-2">
               <div class="text-sm font-medium text-gray-700">
-                {ltiData.lis_person_name_full || ltiData.ext_user_username || $_('nav.userLoading')}
+                {ltiData.lis_person_name_full || ltiData.ext_user_username || ltiData.lis_person_contact_email_primary || $_('nav.user')}
               </div>
               {#if hasAdminOrTeacherRole(ltiData)}
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#2271b3] text-white">

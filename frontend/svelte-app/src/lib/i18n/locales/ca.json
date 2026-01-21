@@ -3,6 +3,7 @@
     "title": "LAMBA",
     "subtitle": "Learning Activities & Machine-Based Assessment",
     "userLoading": "Carregant usuari...",
+    "user": "Usuari",
     "roleAdmin": "Administrador",
     "roleTeacher": "Professor",
     "roleStudent": "Estudiant",

@@ -572,7 +572,7 @@
           <div>
             <div class="flex items-center justify-between mb-2">
               <label for="activity-description" class="block text-sm font-medium text-gray-700">{$_('activity.details.description')}</label>
-              {#if descriptionSaveStatus === 'saving'}}
+              {#if descriptionSaveStatus === 'saving'}
                 <span class="text-xs text-gray-500 flex items-center">
                   <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500 mr-1"></div>
                   {$_('activity.details.saving')}
