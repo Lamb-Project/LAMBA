@@ -152,5 +152,35 @@ export const adminAPI = {
     }
 
     return await response.json();
+  },
+
+  async getLambDebugInfo() {
+    const response = await fetch(`${API_BASE_URL}/debug/lamb`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('Error obteniendo información de debug LAMB');
+    }
+
+    return await response.json();
+  },
+
+  async verifyLambModel(evaluatorId) {
+    const response = await fetch(`${API_BASE_URL}/debug/lamb/verify-model`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ evaluator_id: evaluatorId })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Error verificando modelo LAMB');
+    }
+
+    return await response.json();
   }
 };

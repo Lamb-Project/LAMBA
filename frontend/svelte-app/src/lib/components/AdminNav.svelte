@@ -22,11 +22,13 @@
     { key: 'users', href: '/admin/dashboard/users' },
     { key: 'submissions', href: '/admin/dashboard/submissions' },
     { key: 'files', href: '/admin/dashboard/files' },
-    { key: 'grades', href: '/admin/dashboard/grades' }
+    { key: 'grades', href: '/admin/dashboard/grades' },
+    { key: 'debug', href: '/admin/dashboard/debug' }
   ];
 
   let moreOpen = $state(false);
 
+  /** @param {string} path */
   const isActive = (path) => {
     // Exact match for dashboard home
     if (path === '/admin/dashboard') {
