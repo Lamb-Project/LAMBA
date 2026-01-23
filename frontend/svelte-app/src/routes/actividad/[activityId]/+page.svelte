@@ -1063,8 +1063,10 @@
                         onchange={() => toggleSubmissionSelection(submission.file_submission.id)}
                         class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded cursor-pointer"
                       />
-                      <h4 class="text-lg font-medium text-gray-900">{submission.student_name}</h4>
-                      {#if submission.student_email}
+                      <h4 class="text-lg font-medium text-gray-900">
+                        {submission.student_name || submission.student_email || submission.student_submission?.student_id || $_('activity.student.anonymous')}
+                      </h4>
+                      {#if submission.student_email && submission.student_name}
                         <span class="text-sm text-gray-500">{submission.student_email}</span>
                       {/if}
                     </div>
@@ -1192,7 +1194,7 @@
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {#each group.members as member (member.student_id)}
                           <div class="flex items-center space-x-2 text-sm">
-                            <span class="flex-1">{member.student_name}</span>
+                            <span class="flex-1">{member.student_name || member.student_email || member.student_id || $_('activity.student.anonymous')}</span>
                             {#if member.is_group_leader}
                               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                                 {$_('activity.student.leader')}

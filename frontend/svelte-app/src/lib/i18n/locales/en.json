@@ -99,6 +99,7 @@
     },
       "student": {
         "title": "Activity",
+        "anonymous": "Unknown Student",
         "notFound": "Activity not found",
         "notFoundDescription": "No activity was found with the name corresponding to this LTI session. Make sure the teacher has created an activity with the same name as shown in Moodle.",
         "groupActivity": "Group activity",

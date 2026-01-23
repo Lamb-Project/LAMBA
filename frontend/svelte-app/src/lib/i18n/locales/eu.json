@@ -99,6 +99,7 @@
     },
     "student": {
       "title": "Jarduera",
+      "anonymous": "Ikasle ezezaguna",
       "notFound": "Jarduera ez da aurkitu",
       "notFoundDescription": "Ez da aurkitu LTI saio honi dagokion izena duen jarduerarik. Ziurtatu irakasleak Moodle-n agertzen den izen bereko jarduera sortu duela.",
       "groupActivity": "Talde jarduera",

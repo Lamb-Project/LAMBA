@@ -99,6 +99,7 @@
     },
       "student": {
         "title": "Activitat",
+        "anonymous": "Estudiant desconegut",
         "notFound": "Activitat no trobada",
         "notFoundDescription": "No s’ha trobat cap activitat amb el nom corresponent a aquesta sessió LTI. Assegura’t que el professor hagi creat una activitat amb el mateix nom que apareix a Moodle.",
         "groupActivity": "Activitat en grup",
