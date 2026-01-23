@@ -1143,12 +1143,12 @@
             {/if}
             
             {#each submissionsData.submissions as submission (submission.student_submission.id)}
+              {@const evalStatus = submission.file_submission?.evaluation_status}
+              {@const isProcessing = evalStatus === 'pending' || evalStatus === 'processing'}
               <div class="p-6 hover:bg-gray-50">
                 <div class="flex items-start justify-between mb-4">
                   <div class="flex-1">
                     <div class="flex items-center space-x-3">
-                      {@const evalStatus = submission.file_submission?.evaluation_status}
-                      {@const isProcessing = evalStatus === 'pending' || evalStatus === 'processing'}
                       <input
                         type="checkbox"
                         id="eval-{submission.file_submission.id}"
@@ -1269,12 +1269,12 @@
             {/if}
             
             {#each submissionsData.groups as group (group.group_code)}
+              {@const evalStatus = group.file_submission?.evaluation_status}
+              {@const isProcessing = evalStatus === 'pending' || evalStatus === 'processing'}
               <div class="p-6 hover:bg-gray-50">
                 <div class="flex items-start justify-between mb-4">
                   <div class="flex-1">
                     <div class="flex items-center space-x-3 mb-3">
-                      {@const evalStatus = group.file_submission?.evaluation_status}
-                      {@const isProcessing = evalStatus === 'pending' || evalStatus === 'processing'}
                       <input
                         type="checkbox"
                         id="eval-{group.file_submission.id}"
