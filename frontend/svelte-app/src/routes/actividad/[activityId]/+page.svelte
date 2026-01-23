@@ -4,7 +4,7 @@
   import { browser } from '$app/environment';
   import { _ } from 'svelte-i18n';
   import { formatDate, formatFileSize, formatDateForInput } from '$lib/i18n/formatters.js';
-  import { ltiAwareFetch } from '$lib/auth.js';
+  import { ltiAwareFetch, getLTISessionId } from '$lib/auth.js';
   
   let submissionsData = $state(null);
   let loading = $state(true);
@@ -113,11 +113,21 @@
     editedGrades = newEditedGrades;
   }
   
+  function getDownloadUrl(filePath) {
+    // Build download URL with LTI session for iframe compatibility
+    const baseUrl = `/api/downloads/${encodeURIComponent(filePath)}`;
+    const sessionId = getLTISessionId();
+    if (sessionId) {
+      return `${baseUrl}?lti_session=${encodeURIComponent(sessionId)}`;
+    }
+    return baseUrl;
+  }
+  
   function downloadFile(filePath) {
     // Create a download link for the file
     // The backend will provide the correct filename based on student name or group code
     const link = document.createElement('a');
-    link.href = `/api/downloads/${encodeURIComponent(filePath)}`;
+    link.href = getDownloadUrl(filePath);
     link.click();
   }
   
@@ -899,7 +909,11 @@
                     </div>
                     
                     <div class="mt-2 flex items-center space-x-4 text-sm text-gray-600">
-                      <span>📄 {submission.file_submission.file_name}</span>
+                      <button 
+                        onclick={() => downloadFile(submission.file_submission.file_path)}
+                        class="text-[#2271b3] hover:text-[#195a91] hover:underline cursor-pointer"
+                        title={$_('common.download')}
+                      >📄 {submission.file_submission.file_name}</button>
                       <span>📊 {formatFileSize(submission.file_submission.file_size)}</span>
                       <span>🕒 {formatDate(submission.file_submission.uploaded_at)}</span>
                     </div>
@@ -1002,7 +1016,11 @@
                     
                     <!-- File info -->
                     <div class="mb-3 flex items-center space-x-4 text-sm text-gray-600">
-                      <span>📄 {group.file_submission.file_name}</span>
+                      <button 
+                        onclick={() => downloadFile(group.file_submission.file_path)}
+                        class="text-[#2271b3] hover:text-[#195a91] hover:underline cursor-pointer"
+                        title={$_('common.download')}
+                      >📄 {group.file_submission.file_name}</button>
                       <span>📊 {formatFileSize(group.file_submission.file_size)}</span>
                       <span>🕒 {formatDate(group.file_submission.uploaded_at)}</span>
                     </div>
