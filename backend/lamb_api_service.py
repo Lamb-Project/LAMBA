@@ -156,9 +156,97 @@ class LAMBAPIService:
             return {'success': False, 'error': error_msg}
     
     @staticmethod
+    def validate_chat_completions_format(response: Dict[str, Any]) -> Dict[str, Any]:
+        """Validates that the response follows the expected chat completions format.
+        
+        Expected format (OpenAI-compatible):
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": "..."
+                    }
+                }
+            ]
+        }
+        
+        Returns validation results with details about any issues found.
+        """
+        validation = {
+            'is_valid': True,
+            'format_detected': None,
+            'issues': [],
+            'structure': {}
+        }
+        
+        if not isinstance(response, dict):
+            validation['is_valid'] = False
+            validation['issues'].append(f"Response is not a dict, got: {type(response).__name__}")
+            return validation
+        
+        validation['structure']['top_level_keys'] = list(response.keys())
+        
+        # Check for OpenAI chat completions format
+        if 'choices' in response:
+            validation['format_detected'] = 'openai_chat_completions'
+            choices = response.get('choices', [])
+            
+            if not isinstance(choices, list):
+                validation['is_valid'] = False
+                validation['issues'].append(f"'choices' is not a list, got: {type(choices).__name__}")
+            elif len(choices) == 0:
+                validation['is_valid'] = False
+                validation['issues'].append("'choices' array is empty")
+            else:
+                choice = choices[0]
+                validation['structure']['first_choice_keys'] = list(choice.keys()) if isinstance(choice, dict) else None
+                
+                if not isinstance(choice, dict):
+                    validation['is_valid'] = False
+                    validation['issues'].append(f"First choice is not a dict, got: {type(choice).__name__}")
+                elif 'message' in choice:
+                    message = choice.get('message', {})
+                    validation['structure']['message_keys'] = list(message.keys()) if isinstance(message, dict) else None
+                    
+                    if not isinstance(message, dict):
+                        validation['is_valid'] = False
+                        validation['issues'].append(f"'message' is not a dict, got: {type(message).__name__}")
+                    elif 'content' not in message:
+                        validation['is_valid'] = False
+                        validation['issues'].append("'message' does not contain 'content' key")
+                    elif not isinstance(message.get('content'), str):
+                        validation['issues'].append(f"'content' is not a string, got: {type(message.get('content')).__name__}")
+                elif 'text' in choice:
+                    validation['format_detected'] = 'openai_completions_legacy'
+                    if not isinstance(choice.get('text'), str):
+                        validation['issues'].append(f"'text' is not a string, got: {type(choice.get('text')).__name__}")
+                else:
+                    validation['is_valid'] = False
+                    validation['issues'].append("First choice has neither 'message' nor 'text' key")
+        
+        # Check for alternative formats
+        elif 'content' in response:
+            validation['format_detected'] = 'simple_content'
+            if not isinstance(response.get('content'), str):
+                validation['issues'].append(f"'content' is not a string, got: {type(response.get('content')).__name__}")
+        elif 'text' in response:
+            validation['format_detected'] = 'simple_text'
+            if not isinstance(response.get('text'), str):
+                validation['issues'].append(f"'text' is not a string, got: {type(response.get('text')).__name__}")
+        else:
+            validation['is_valid'] = False
+            validation['format_detected'] = 'unknown'
+            validation['issues'].append("Response doesn't match any known format (missing 'choices', 'content', or 'text')")
+        
+        return validation
+    
+    @staticmethod
     def parse_evaluation_response(response: Dict[str, Any]) -> Dict[str, Any]:
         """Parsea la respuesta de LAMB API para extraer nota y feedback"""
         try:
+            # First validate the response format
+            validation = LAMBAPIService.validate_chat_completions_format(response)
+            
             content = None
             
             if 'choices' in response and len(response['choices']) > 0:
@@ -170,13 +258,25 @@ class LAMBAPIService:
                 content = response['text']
             
             if content:
-                return LAMBAPIService._extract_score_and_feedback(content)
+                result = LAMBAPIService._extract_score_and_feedback(content)
+                result['json_validation'] = validation
+                return result
             
-            return {'score': None, 'comment': str(response), 'raw_response': response}
+            return {
+                'score': None, 
+                'comment': str(response), 
+                'raw_response': response,
+                'json_validation': validation
+            }
                 
         except Exception as e:
             logging.error(f"Error parseando respuesta LAMB: {str(e)}")
-            return {'score': None, 'comment': f"Error al procesar respuesta: {str(e)}", 'raw_response': response}
+            return {
+                'score': None, 
+                'comment': f"Error al procesar respuesta: {str(e)}", 
+                'raw_response': response,
+                'json_validation': {'is_valid': False, 'issues': [str(e)]}
+            }
     
     @staticmethod
     def _extract_score_and_feedback(content: str) -> Dict[str, Any]:

@@ -332,6 +332,8 @@ class GradeService:
         
         if debug_info:
             debug_info['parsed_response'] = parsed
+            # Add JSON validation results as a top-level field for easy access
+            debug_info['json_validation'] = parsed.get('json_validation', {})
         
         score = parsed.get('score', 7.0)
         comment = parsed.get('comment', 'Evaluación completada')

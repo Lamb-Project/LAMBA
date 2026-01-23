@@ -928,6 +928,36 @@
                     </div>
                   {/if}
                   
+                  <!-- JSON Validation Results -->
+                  {#if info.json_validation}
+                    <div>
+                      <h5 class="font-semibold text-gray-700 mb-1">JSON Format Validation:</h5>
+                      <div class="bg-gray-100 p-2 rounded">
+                        <p class="text-gray-800">
+                          <strong>Valid:</strong> 
+                          <span class={info.json_validation.is_valid ? 'text-green-600' : 'text-red-600'}>
+                            {info.json_validation.is_valid ? 'Yes' : 'No'}
+                          </span>
+                        </p>
+                        {#if info.json_validation.format_detected}
+                          <p class="text-gray-800 mt-1"><strong>Format Detected:</strong> {info.json_validation.format_detected}</p>
+                        {/if}
+                        {#if info.json_validation.structure}
+                          <p class="text-gray-800 mt-1"><strong>Structure:</strong></p>
+                          <pre class="text-xs bg-gray-200 p-1 rounded mt-1">{JSON.stringify(info.json_validation.structure, null, 2)}</pre>
+                        {/if}
+                        {#if info.json_validation.issues && info.json_validation.issues.length > 0}
+                          <p class="text-red-600 mt-2"><strong>Issues Found:</strong></p>
+                          <ul class="list-disc list-inside text-red-600 text-xs mt-1">
+                            {#each info.json_validation.issues as issue}
+                              <li>{issue}</li>
+                            {/each}
+                          </ul>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
+                  
                   <!-- Parsed Response -->
                   {#if info.parsed_response}
                     <div>
