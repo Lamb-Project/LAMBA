@@ -290,6 +290,39 @@ async def get_current_session_data(request: Request):
         logging.error(f"Error obteniendo datos LTI: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error obteniendo datos LTI: {str(e)}")
 
+@app.get("/api/debug-mode")
+async def get_debug_mode(request: Request):
+    """Returns whether debug mode is enabled (only for instructors/teachers)
+    
+    Debug mode shows raw AI responses for evaluation troubleshooting.
+    Only returns true if DEBUG=true in environment AND user is an instructor.
+    """
+    try:
+        session_id = get_session_id_from_request(request)
+        if not session_id:
+            return {"debug_mode": False}
+        
+        if session_id not in lti_data_store:
+            return {"debug_mode": False}
+        
+        lti_data = lti_data_store[session_id]
+        
+        # Only show debug mode to instructors/teachers
+        roles = lti_data.get('roles', '').lower()
+        is_instructor = 'instructor' in roles or 'teacher' in roles or 'admin' in roles
+        
+        if not is_instructor:
+            return {"debug_mode": False}
+        
+        # Check environment variable
+        debug_enabled = os.getenv('DEBUG', 'false').lower() in ('true', '1', 'yes')
+        
+        return {"debug_mode": debug_enabled}
+        
+    except Exception as e:
+        logging.error(f"Error checking debug mode: {str(e)}")
+        return {"debug_mode": False}
+
 @app.get("/api/downloads/{file_path:path}")
 async def download_file(file_path: str, request: Request):
     """Descarga archivos subidos (solo para profesores/administradores)"""

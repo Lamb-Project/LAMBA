@@ -37,14 +37,32 @@
   let selectedForEvaluation = $state({}); // {file_submission_id: boolean}
   let selectAllEvaluation = $state(false);
   
+  // Debug mode state
+  let debugMode = $state(false);
+  let evaluationDebugInfo = $state(null);
+  let debugInfoExpanded = $state({}); // {index: boolean}
+  
   // Get activity ID from URL params
   let activityId = $derived($page.params.activityId);
   
   onMount(async () => {
     if (browser && activityId) {
-      await loadSubmissions();
+      await Promise.all([loadSubmissions(), checkDebugMode()]);
     }
   });
+  
+  async function checkDebugMode() {
+    try {
+      const response = await ltiAwareFetch('/api/debug-mode');
+      if (response.ok) {
+        const data = await response.json();
+        debugMode = data.debug_mode || false;
+      }
+    } catch (err) {
+      console.error('Error checking debug mode:', err);
+      debugMode = false;
+    }
+  }
   
   async function loadSubmissions() {
     try {
@@ -182,6 +200,8 @@
     try {
       creatingEvaluation = true;
       evaluationMessage = null;
+      evaluationDebugInfo = null;
+      debugInfoExpanded = {};
       
       // Get selected file submissions
       const selectedSubmissions = Object.entries(selectedForEvaluation)
@@ -222,6 +242,11 @@
           details: result.grades_created > 0 ? $_('activity.submissions.gradesCreated', { values: { count: result.grades_created } }) : null
         };
         
+        // Store debug info if available (only when DEBUG=true on server)
+        if (result.debug_info && result.debug_info.length > 0) {
+          evaluationDebugInfo = result.debug_info;
+        }
+        
         // Clear selections
         selectedForEvaluation = {};
         selectAllEvaluation = false;
@@ -236,7 +261,7 @@
         };
       }
       
-      // Clear message after 10 seconds
+      // Clear message after 10 seconds (but not debug info - user can dismiss it)
       setTimeout(() => {
         evaluationMessage = null;
       }, 10000);
@@ -256,6 +281,15 @@
     } finally {
       creatingEvaluation = false;
     }
+  }
+  
+  function toggleDebugInfoExpanded(index) {
+    debugInfoExpanded[index] = !debugInfoExpanded[index];
+  }
+  
+  function clearDebugInfo() {
+    evaluationDebugInfo = null;
+    debugInfoExpanded = {};
   }
   
   function toggleSelectAll() {
@@ -826,6 +860,91 @@
               {/if}
             </div>
           </div>
+        </div>
+      {/if}
+      
+      <!-- Debug Info Section (only visible when DEBUG=true) -->
+      {#if debugMode && evaluationDebugInfo && evaluationDebugInfo.length > 0}
+        <div class="mt-4 p-4 rounded-md bg-yellow-50 border border-yellow-300">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center">
+              <svg class="h-5 w-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+              <h4 class="text-sm font-bold text-yellow-800">DEBUG: AI Evaluation Response</h4>
+            </div>
+            <button
+              onclick={clearDebugInfo}
+              class="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
+            >
+              Dismiss
+            </button>
+          </div>
+          
+          <p class="text-xs text-yellow-700 mb-3">
+            This debug information is only visible because DEBUG=true is set in the server configuration.
+          </p>
+          
+          {#each evaluationDebugInfo as info, index (index)}
+            <div class="mb-3 bg-white rounded border border-yellow-200 overflow-hidden">
+              <button
+                onclick={() => toggleDebugInfoExpanded(index)}
+                class="w-full px-4 py-2 flex items-center justify-between bg-yellow-100 hover:bg-yellow-200 text-left"
+              >
+                <span class="text-sm font-medium text-yellow-800">
+                  {info.file_name || `Submission ${index + 1}`}
+                </span>
+                <svg 
+                  class="h-4 w-4 text-yellow-600 transform transition-transform {debugInfoExpanded[index] ? 'rotate-180' : ''}" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              
+              {#if debugInfoExpanded[index]}
+                <div class="p-4 space-y-4 text-xs">
+                  <!-- Evaluator ID -->
+                  <div>
+                    <h5 class="font-semibold text-gray-700 mb-1">Evaluator ID:</h5>
+                    <code class="block bg-gray-100 p-2 rounded text-gray-800">{info.evaluator_id || 'N/A'}</code>
+                  </div>
+                  
+                  <!-- Extracted Text (truncated) -->
+                  {#if info.extracted_text}
+                    <div>
+                      <h5 class="font-semibold text-gray-700 mb-1">Extracted Text (first 2000 chars):</h5>
+                      <pre class="block bg-gray-100 p-2 rounded text-gray-800 whitespace-pre-wrap overflow-auto max-h-40">{info.extracted_text}</pre>
+                    </div>
+                  {/if}
+                  
+                  <!-- Raw LAMB Response -->
+                  {#if info.lamb_raw_response}
+                    <div>
+                      <h5 class="font-semibold text-gray-700 mb-1">Raw LAMB API Response:</h5>
+                      <pre class="block bg-gray-100 p-2 rounded text-gray-800 whitespace-pre-wrap overflow-auto max-h-60">{typeof info.lamb_raw_response === 'object' ? JSON.stringify(info.lamb_raw_response, null, 2) : info.lamb_raw_response}</pre>
+                    </div>
+                  {/if}
+                  
+                  <!-- Parsed Response -->
+                  {#if info.parsed_response}
+                    <div>
+                      <h5 class="font-semibold text-gray-700 mb-1">Parsed Score & Comment:</h5>
+                      <div class="bg-gray-100 p-2 rounded">
+                        <p class="text-gray-800"><strong>Score:</strong> {info.parsed_response.score !== null ? info.parsed_response.score : 'Not found'}</p>
+                        {#if info.parsed_response.comment}
+                          <p class="text-gray-800 mt-1"><strong>Comment:</strong></p>
+                          <pre class="whitespace-pre-wrap mt-1">{info.parsed_response.comment}</pre>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          {/each}
         </div>
       {/if}
     </div>

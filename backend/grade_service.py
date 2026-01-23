@@ -2,13 +2,17 @@ import uuid
 import os
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from models import Grade, GradeRequest
 from db_models import GradeDB, FileSubmissionDB, ActivityDB
 from database import get_db_session
 from document_extractor import DocumentExtractor
 from lamb_api_service import LAMBAPIService
+
+def is_debug_mode() -> bool:
+    """Check if debug mode is enabled via environment variable"""
+    return os.getenv('DEBUG', 'false').lower() in ('true', '1', 'yes')
 
 class GradeService:
     
@@ -137,7 +141,7 @@ class GradeService:
             db.close()
     
     @staticmethod
-    def create_automatic_evaluation_for_activity(activity_id: str, activity_moodle_id: str, file_submission_ids: list = None) -> List[Grade]:
+    def create_automatic_evaluation_for_activity(activity_id: str, activity_moodle_id: str, file_submission_ids: list = None) -> Dict[str, Any]:
         """
         Create grades for submissions in an activity using LAMB evaluation.
         Requires evaluator_id to be configured for the activity.
@@ -147,8 +151,13 @@ class GradeService:
             activity_moodle_id: Moodle instance ID
             file_submission_ids: Optional list of specific file submission IDs to evaluate.
                                 If None, evaluates all submissions without grades.
+        
+        Returns:
+            Dictionary with 'grades' list and 'debug_info' list (when DEBUG=true)
         """
         db = get_db_session()
+        debug_mode = is_debug_mode()
+        
         try:
             # Get activity to check if evaluator_id is configured (using composite key)
             activity = db.query(ActivityDB).filter(
@@ -194,10 +203,11 @@ class GradeService:
 
             if not file_submissions:
                 logging.info(f"No submissions to evaluate for activity {activity_id}")
-                return []
+                return {'grades': [], 'debug_info': [] if debug_mode else None}
 
             logging.info(f"Processing {len(file_submissions)} submissions with LAMB")
             created_grades = []
+            debug_info_list = [] if debug_mode else None
             errors = []
 
             for file_submission in file_submissions:
@@ -207,6 +217,10 @@ class GradeService:
                         file_submission,
                         activity.evaluator_id
                     )
+                    
+                    # Collect debug info if in debug mode
+                    if debug_mode and grade_result.get('debug_info'):
+                        debug_info_list.append(grade_result['debug_info'])
                     
                     # Create grade in database
                     grade_id = str(uuid.uuid4())
@@ -244,7 +258,10 @@ class GradeService:
             if errors:
                 logging.warning(f"Completed with {len(errors)} errors: {'; '.join(errors)}")
             
-            return created_grades
+            return {
+                'grades': created_grades,
+                'debug_info': debug_info_list
+            }
             
         finally:
             db.close()
@@ -259,8 +276,19 @@ class GradeService:
             evaluator_id: LAMB evaluator ID
             
         Returns:
-            Dictionary with score and comment
+            Dictionary with score, comment, and debug_info (when DEBUG=true)
         """
+        debug_info = None
+        if is_debug_mode():
+            debug_info = {
+                'file_name': file_submission.file_name,
+                'file_submission_id': file_submission.id,
+                'evaluator_id': evaluator_id,
+                'extracted_text': None,
+                'lamb_raw_response': None,
+                'parsed_response': None
+            }
+        
         # Get absolute path to file
         # Assuming file_path is relative to uploads directory
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -271,11 +299,16 @@ class GradeService:
         # Extract text from document
         extracted_text = DocumentExtractor.extract_text_from_file(file_abs_path)
         
+        if debug_info:
+            # Truncate extracted text for debug to avoid huge responses
+            debug_info['extracted_text'] = extracted_text[:2000] + '...' if extracted_text and len(extracted_text) > 2000 else extracted_text
+        
         if not extracted_text or not extracted_text.strip():
             logging.warning(f"Could not extract text from {file_submission.file_name}")
             return {
                 'score': 5.0,
-                'comment': "No se pudo extraer texto del documento para evaluar. Verifica el formato del archivo."
+                'comment': "No se pudo extraer texto del documento para evaluar. Verifica el formato del archivo.",
+                'debug_info': debug_info
             }
         
         logging.info(f"Extracted {len(extracted_text)} characters from document")
@@ -283,15 +316,22 @@ class GradeService:
         # Send to LAMB for evaluation
         lamb_result = LAMBAPIService.evaluate_text(extracted_text, evaluator_id)
         
+        if debug_info:
+            debug_info['lamb_raw_response'] = lamb_result.get('response') if lamb_result.get('success') else lamb_result.get('error')
+        
         if not lamb_result['success']:
             logging.error(f"LAMB evaluation failed: {lamb_result['error']}")
             return {
                 'score': 5.0,
-                'comment': f"Error en la evaluación automática: {lamb_result['error']}"
+                'comment': f"Error en la evaluación automática: {lamb_result['error']}",
+                'debug_info': debug_info
             }
         
         # Parse LAMB response
         parsed = LAMBAPIService.parse_evaluation_response(lamb_result['response'])
+        
+        if debug_info:
+            debug_info['parsed_response'] = parsed
         
         score = parsed.get('score', 7.0)
         comment = parsed.get('comment', 'Evaluación completada')
@@ -301,5 +341,6 @@ class GradeService:
         
         return {
             'score': score,
-            'comment': comment
+            'comment': comment,
+            'debug_info': debug_info
         }

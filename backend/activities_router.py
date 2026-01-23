@@ -283,6 +283,8 @@ async def evaluate_activity(activity_id: str, request: Request):
     
     Acepta un JSON con un array opcional de file_submission_ids.
     Si no se proporciona, evalúa todas las entregas sin calificación.
+    
+    When DEBUG=true in environment, returns additional debug_info with raw AI responses.
     """
     try:
         lti_data = get_lti_session_data(request)
@@ -306,15 +308,25 @@ async def evaluate_activity(activity_id: str, request: Request):
         if file_submission_ids:
             logging.info(f"Evaluando {len(file_submission_ids)} entregas específicas")
         
-        results = GradeService.create_automatic_evaluation_for_activity(activity_id, moodle_id, file_submission_ids)
+        evaluation_result = GradeService.create_automatic_evaluation_for_activity(activity_id, moodle_id, file_submission_ids)
         
-        logging.info(f"Evaluación automática completada para actividad {activity_id}: {len(results)} calificaciones creadas")
+        # Extract grades and debug_info from the result
+        grades = evaluation_result.get('grades', [])
+        debug_info = evaluation_result.get('debug_info')
         
-        return {
+        logging.info(f"Evaluación automática completada para actividad {activity_id}: {len(grades)} calificaciones creadas")
+        
+        response = {
             "success": True,
-            "message": "Evaluación automática completada exitosamente" if len(results) > 0 else "No hay entregas pendientes de evaluar",
-            "grades_created": len(results)
+            "message": "Evaluación automática completada exitosamente" if len(grades) > 0 else "No hay entregas pendientes de evaluar",
+            "grades_created": len(grades)
         }
+        
+        # Include debug_info only when DEBUG=true (debug_info will be None otherwise)
+        if debug_info is not None:
+            response["debug_info"] = debug_info
+        
+        return response
         
     except HTTPException:
         raise
