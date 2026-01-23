@@ -306,7 +306,13 @@
         "helpItem1": "LAMB_API_URL no està correctament configurat al fitxer .env",
         "helpItem2": "El servidor LAMB no s'està executant o no és accessible",
         "helpItem3": "Xarxa/firewall bloquejant la connexió entre servidors",
-        "helpItem4": "L'ID de l'avaluador no coincideix amb cap model al servidor LAMB"
+        "helpItem4": "L'ID de l'avaluador no coincideix amb cap model al servidor LAMB",
+        "curlCommands": "Comandes de Debug (curl)",
+        "curlDescription": "Executa aquestes comandes per provar la connectivitat des de diferents ubicacions:",
+        "curlDescriptionJson": "El servidor ha retornat HTML en lloc de JSON. Executa aquestes comandes per investigar:",
+        "curlFromLamba": "Des del contenidor LAMBA (prova xarxa interna):",
+        "curlDirect": "Crida directa (prova accés extern):",
+        "curlWithHeaders": "Amb capçalera Accept:"
       }
     }
   }

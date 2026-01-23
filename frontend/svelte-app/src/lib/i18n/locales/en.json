@@ -306,7 +306,13 @@
         "helpItem1": "LAMB_API_URL is not correctly configured in the .env file",
         "helpItem2": "The LAMB server is not running or not accessible",
         "helpItem3": "Network/firewall blocking the connection between servers",
-        "helpItem4": "The evaluator ID does not match any model on the LAMB server"
+        "helpItem4": "The evaluator ID does not match any model on the LAMB server",
+        "curlCommands": "Debug Commands (curl)",
+        "curlDescription": "Run these commands to test connectivity from different locations:",
+        "curlDescriptionJson": "The server returned HTML instead of JSON. Run these commands to investigate:",
+        "curlFromLamba": "From LAMBA container (tests internal network):",
+        "curlDirect": "Direct call (tests external access):",
+        "curlWithHeaders": "With Accept header:"
       }
     }
   }

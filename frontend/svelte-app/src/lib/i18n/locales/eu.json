@@ -306,7 +306,13 @@
       "helpItem1": "LAMB_API_URL ez dago behar bezala konfiguratuta .env fitxategian",
       "helpItem2": "LAMB zerbitzaria ez dago martxan edo ez da eskuragarri",
       "helpItem3": "Sarea/suebakia zerbitzarien arteko konexioa blokeatzen",
-      "helpItem4": "Ebaluatzailearen IDa ez dator bat LAMB zerbitzariko modelo batekin"
+      "helpItem4": "Ebaluatzailearen IDa ez dator bat LAMB zerbitzariko modelo batekin",
+      "curlCommands": "Debug Komandoak (curl)",
+      "curlDescription": "Exekutatu komando hauek konektibitatea leku ezberdinetatik probatzeko:",
+      "curlDescriptionJson": "Zerbitzariak HTML itzuli du JSON ordez. Exekutatu komando hauek ikertzeko:",
+      "curlFromLamba": "LAMBA edukiontzitik (barne sarea probatzen):",
+      "curlDirect": "Zuzeneko deia (kanpo sarbidea probatzen):",
+      "curlWithHeaders": "Accept goiburuarekin:"
     }
   }
 }

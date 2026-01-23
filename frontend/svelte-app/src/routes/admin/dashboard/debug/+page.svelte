@@ -128,6 +128,8 @@
       <div class="px-6 py-4">
         {#if lambDebugInfo.tests?.connectivity}
           {@const conn = lambDebugInfo.tests.connectivity}
+          {@const apiUrl = lambDebugInfo.config?.LAMB_API_URL || ''}
+          {@const token = lambDebugInfo.config?.LAMB_BEARER_TOKEN?.replace('...', '***') || ''}
           {#if conn.error}
             <div class="p-4 bg-red-50 rounded-lg border border-red-200">
               <div class="flex items-center">
@@ -135,6 +137,22 @@
                 <div>
                   <p class="font-medium text-red-800">{$_('admin.debug.connectionFailed')}</p>
                   <p class="text-sm text-red-600 mt-1">{conn.error}</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Curl Commands for Connection Error -->
+            <div class="mt-4 p-4 bg-gray-800 rounded-lg border border-gray-700">
+              <p class="text-sm font-medium text-gray-300 mb-2">{$_('admin.debug.curlCommands')}</p>
+              <p class="text-xs text-gray-400 mb-3">{$_('admin.debug.curlDescription')}</p>
+              <div class="space-y-3">
+                <div>
+                  <p class="text-xs text-gray-400 mb-1">{$_('admin.debug.curlFromLamba')}</p>
+                  <pre class="p-2 bg-gray-900 rounded text-xs text-green-400 overflow-x-auto">docker exec -it lamba-backend-1 curl -v "{apiUrl}/v1/models"</pre>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-400 mb-1">{$_('admin.debug.curlDirect')}</p>
+                  <pre class="p-2 bg-gray-900 rounded text-xs text-green-400 overflow-x-auto">curl -v "{apiUrl}/v1/models"</pre>
                 </div>
               </div>
             </div>
@@ -169,6 +187,28 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Curl Commands when JSON parsing fails -->
+              {#if !conn.json_parsed}
+                <div class="p-4 bg-gray-800 rounded-lg border border-gray-700">
+                  <p class="text-sm font-medium text-gray-300 mb-2">{$_('admin.debug.curlCommands')}</p>
+                  <p class="text-xs text-gray-400 mb-3">{$_('admin.debug.curlDescriptionJson')}</p>
+                  <div class="space-y-3">
+                    <div>
+                      <p class="text-xs text-gray-400 mb-1">{$_('admin.debug.curlFromLamba')}</p>
+                      <pre class="p-2 bg-gray-900 rounded text-xs text-green-400 overflow-x-auto">docker exec -it lamba-backend-1 curl -v "{apiUrl}/v1/models"</pre>
+                    </div>
+                    <div>
+                      <p class="text-xs text-gray-400 mb-1">{$_('admin.debug.curlDirect')}</p>
+                      <pre class="p-2 bg-gray-900 rounded text-xs text-green-400 overflow-x-auto">curl -v "{conn.url}"</pre>
+                    </div>
+                    <div>
+                      <p class="text-xs text-gray-400 mb-1">{$_('admin.debug.curlWithHeaders')}</p>
+                      <pre class="p-2 bg-gray-900 rounded text-xs text-green-400 overflow-x-auto">curl -v -H "Accept: application/json" "{conn.url}"</pre>
+                    </div>
+                  </div>
+                </div>
+              {/if}
 
               <!-- Available Models -->
               {#if conn.available_models}

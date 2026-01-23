@@ -1,6 +1,7 @@
 <script>
   import { base } from '$app/paths';
   import { page } from '$app/stores';
+  import { onMount } from 'svelte';
   import LanguageSelector from '$lib/components/LanguageSelector.svelte';
   import { _ } from 'svelte-i18n';
   
@@ -27,6 +28,8 @@
   ];
 
   let moreOpen = $state(false);
+  /** @type {HTMLDivElement|null} */
+  let menuRef = $state(null);
 
   /** @param {string} path */
   const isActive = (path) => {
@@ -42,6 +45,24 @@
   function toggleMore() {
     moreOpen = !moreOpen;
   }
+
+  function closeMenu() {
+    moreOpen = false;
+  }
+
+  /** @param {MouseEvent} event */
+  function handleClickOutside(event) {
+    if (moreOpen && menuRef && !menuRef.contains(/** @type {Node} */ (event.target))) {
+      closeMenu();
+    }
+  }
+
+  onMount(() => {
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  });
 </script>
 
 <nav class="bg-white shadow">
@@ -78,7 +99,7 @@
               </a>
             {/each}
 
-            <div class="relative tools-menu h-full flex items-center">
+            <div class="relative tools-menu h-full flex items-center" bind:this={menuRef}>
               <button
                 aria-haspopup="true"
                 aria-expanded={moreOpen ? 'true' : 'false'}
@@ -106,6 +127,7 @@
                     {#each secondaryNav as item}
                       <a
                         href={item.href}
+                        onclick={closeMenu}
                         class={
                           isActive(item.href)
                             ? 'block px-4 py-3 text-sm font-medium text-gray-700 hover:text-[#2271b3] hover:bg-gray-50 transition-colors duration-150 bg-blue-50 text-[#2271b3]'
