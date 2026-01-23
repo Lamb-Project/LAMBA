@@ -1512,27 +1512,28 @@
                 </div>
                 
                 <!-- Progress Bar -->
-                <div class="w-full bg-gray-200 rounded-full h-3">
-                  {@const total = evaluationStatus.counts?.total || 1}
-                  {@const completed = evaluationStatus.counts?.completed || 0}
-                  {@const errors = evaluationStatus.counts?.error || 0}
-                  {@const processing = evaluationStatus.counts?.processing || 0}
+                {#if evaluationStatus.counts}
+                  {@const total = evaluationStatus.counts.total || 1}
+                  {@const completed = evaluationStatus.counts.completed || 0}
+                  {@const errors = evaluationStatus.counts.error || 0}
+                  {@const processing = evaluationStatus.counts.processing || 0}
                   {@const completedPct = (completed / total) * 100}
                   {@const errorPct = (errors / total) * 100}
                   {@const processingPct = (processing / total) * 100}
-                  
-                  <div class="h-3 rounded-full flex overflow-hidden">
-                    {#if completedPct > 0}
-                      <div class="bg-green-500 h-full transition-all duration-300" style="width: {completedPct}%"></div>
-                    {/if}
-                    {#if errorPct > 0}
-                      <div class="bg-red-500 h-full transition-all duration-300" style="width: {errorPct}%"></div>
-                    {/if}
-                    {#if processingPct > 0}
-                      <div class="bg-blue-500 h-full animate-pulse transition-all duration-300" style="width: {processingPct}%"></div>
-                    {/if}
+                  <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div class="h-3 rounded-full flex overflow-hidden">
+                      {#if completedPct > 0}
+                        <div class="bg-green-500 h-full transition-all duration-300" style="width: {completedPct}%"></div>
+                      {/if}
+                      {#if errorPct > 0}
+                        <div class="bg-red-500 h-full transition-all duration-300" style="width: {errorPct}%"></div>
+                      {/if}
+                      {#if processingPct > 0}
+                        <div class="bg-blue-500 h-full animate-pulse transition-all duration-300" style="width: {processingPct}%"></div>
+                      {/if}
+                    </div>
                   </div>
-                </div>
+                {/if}
                 
                 <!-- Status Legend -->
                 <div class="mt-3 flex flex-wrap gap-3 text-xs">
