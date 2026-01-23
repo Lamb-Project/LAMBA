@@ -467,12 +467,22 @@ class ActivitiesService:
                 # If it's a group submission, organize by group
                 if file_submission.group_code:
                     if file_submission.group_code not in groups_dict:
+                        # Convert Grade Pydantic model to dict for proper JSON serialization
+                        grade_dict = None
+                        if grade:
+                            grade_dict = {
+                                'id': grade.id,
+                                'file_submission_id': grade.file_submission_id,
+                                'score': grade.score,
+                                'comment': grade.comment,
+                                'created_at': grade.created_at.isoformat() + 'Z' if grade.created_at else None
+                            }
                         groups_dict[file_submission.group_code] = {
                             'group_code': file_submission.group_code,
                             'file_submission': submission_view.file_submission,
                             'members': [],
                             'group_leader': None,
-                            'grade': grade  # Add grade at group level
+                            'grade': grade_dict  # Add grade at group level (as dict)
                         }
                     
                     member_info = {
