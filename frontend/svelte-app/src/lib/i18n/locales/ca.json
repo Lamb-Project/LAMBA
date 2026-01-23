@@ -93,6 +93,7 @@
       "failed": "Fallides",
       "total": "Total",
       "gradesCreated": "S'han creat {count} avaluacions",
+      "gradesUpdated": "S'han actualitzat {count} avaluacions",
       "selectAllForEvaluation": "Seleccionar-ho tot per a l'avaluació automàtica",
       "selectSubmissionsToEvaluate": "Selecciona almenys un lliurament per avaluar automàticament"
     },

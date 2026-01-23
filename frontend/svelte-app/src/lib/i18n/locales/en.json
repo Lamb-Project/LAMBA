@@ -93,6 +93,7 @@
       "failed": "Failed",
       "total": "Total",
       "gradesCreated": "{count} evaluations created",
+      "gradesUpdated": "{count} evaluations updated",
       "selectAllForEvaluation": "Select all for automatic evaluation",
       "selectSubmissionsToEvaluate": "Select at least one submission to evaluate automatically"
     },

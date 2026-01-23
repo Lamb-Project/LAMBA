@@ -310,17 +310,42 @@ async def evaluate_activity(activity_id: str, request: Request):
         
         evaluation_result = GradeService.create_automatic_evaluation_for_activity(activity_id, moodle_id, file_submission_ids)
         
-        # Extract grades and debug_info from the result
+        # Extract results from the evaluation
         grades = evaluation_result.get('grades', [])
+        updated_grades = evaluation_result.get('updated_grades', [])
         debug_info = evaluation_result.get('debug_info')
+        errors = evaluation_result.get('errors')
+        result_message = evaluation_result.get('message')
         
-        logging.info(f"Evaluación automática completada para actividad {activity_id}: {len(grades)} calificaciones creadas")
+        total_processed = len(grades) + len(updated_grades)
+        
+        logging.info(f"Evaluación automática completada para actividad {activity_id}: {len(grades)} nuevas, {len(updated_grades)} actualizadas")
+        
+        # Build informative message
+        if result_message:
+            message = result_message
+        elif total_processed > 0:
+            parts = []
+            if len(grades) > 0:
+                parts.append(f"{len(grades)} nueva(s)")
+            if len(updated_grades) > 0:
+                parts.append(f"{len(updated_grades)} actualizada(s)")
+            message = f"Evaluación completada: {' y '.join(parts)}"
+        else:
+            message = "No se encontraron entregas para evaluar"
         
         response = {
             "success": True,
-            "message": "Evaluación automática completada exitosamente" if len(grades) > 0 else "No hay entregas pendientes de evaluar",
-            "grades_created": len(grades)
+            "message": message,
+            "grades_created": len(grades),
+            "grades_updated": len(updated_grades),
+            "total_processed": total_processed
         }
+        
+        # Include errors if any
+        if errors:
+            response["errors"] = errors
+            response["message"] += f" ({len(errors)} error(es))"
         
         # Include debug_info only when DEBUG=true (debug_info will be None otherwise)
         if debug_info is not None:

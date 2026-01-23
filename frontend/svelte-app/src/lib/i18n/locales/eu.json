@@ -93,6 +93,7 @@
       "failed": "Huts eginda",
       "total": "Guztira",
       "gradesCreated": "{count} ebaluazio sortu dira",
+      "gradesUpdated": "{count} ebaluazio eguneratu dira",
       "selectAllForEvaluation": "Hautatu guztiak ebaluazio automatikorako",
       "selectSubmissionsToEvaluate": "Hautatu gutxienez entrega bat automatikoki ebaluatzeko"
     },

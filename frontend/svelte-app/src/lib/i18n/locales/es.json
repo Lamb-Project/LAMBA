@@ -93,6 +93,7 @@
       "failed": "Fallidas",
       "total": "Total",
       "gradesCreated": "Se crearon {count} evaluaciones",
+      "gradesUpdated": "Se actualizaron {count} evaluaciones",
       "selectAllForEvaluation": "Seleccionar todas para evaluar automáticamente",
       "selectSubmissionsToEvaluate": "Selecciona al menos una entrega para evaluar automáticamente"
     },

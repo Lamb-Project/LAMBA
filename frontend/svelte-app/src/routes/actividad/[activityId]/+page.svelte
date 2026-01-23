@@ -236,10 +236,22 @@
       const result = await response.json();
       
       if (response.ok && result.success) {
+        // Build details message
+        let detailParts = [];
+        if (result.grades_created > 0) {
+          detailParts.push($_('activity.submissions.gradesCreated', { values: { count: result.grades_created } }));
+        }
+        if (result.grades_updated > 0) {
+          detailParts.push($_('activity.submissions.gradesUpdated', { values: { count: result.grades_updated } }));
+        }
+        if (result.errors && result.errors.length > 0) {
+          detailParts.push(`${result.errors.length} error(s)`);
+        }
+        
         evaluationMessage = {
-          type: 'success',
+          type: result.errors && result.errors.length > 0 ? 'warning' : 'success',
           message: result.message,
-          details: result.grades_created > 0 ? $_('activity.submissions.gradesCreated', { values: { count: result.grades_created } }) : null
+          details: detailParts.length > 0 ? detailParts.join(' | ') : null
         };
         
         // Store debug info if available (only when DEBUG=true on server)
