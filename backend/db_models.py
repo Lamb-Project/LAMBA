@@ -89,6 +89,12 @@ class FileSubmissionDB(Base):
     group_code = Column(String, nullable=True)  # Unique code for group submissions
     max_group_members = Column(Integer, default=1)  # Max members allowed for this submission
     
+    # Evaluation status tracking for background processing
+    # Values: null (not evaluated), 'pending', 'processing', 'completed', 'error'
+    evaluation_status = Column(String, nullable=True, index=True)
+    evaluation_started_at = Column(DateTime, nullable=True)  # When evaluation started (for timeout detection)
+    evaluation_error = Column(Text, nullable=True)  # Error message if evaluation failed
+    
     # Foreign key constraints for composite keys
     __table_args__ = (
         ForeignKeyConstraint(['uploaded_by', 'uploaded_by_moodle_id'], ['users.id', 'users.moodle_id']),

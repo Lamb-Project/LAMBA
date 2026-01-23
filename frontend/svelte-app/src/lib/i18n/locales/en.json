@@ -173,6 +173,20 @@
         "code": "Group {code}",
         "members": "{count} member",
         "members_plural": "{count} members"
+      },
+      "evaluation": {
+        "status": "Evaluation Status",
+        "inProgress": "Evaluation in Progress",
+        "completed": "Evaluation Complete",
+        "completedWithErrors": "Evaluation Complete (with errors)",
+        "progress": "Progress",
+        "pending": "Pending",
+        "processing": "Processing",
+        "done": "Done",
+        "errors": "Errors",
+        "error": "Error",
+        "pleaseWait": "Processing... You can navigate away, evaluation will continue.",
+        "someAlreadyProcessing": "{count} submission(s) already being processed"
       }
     },
     "errors": {

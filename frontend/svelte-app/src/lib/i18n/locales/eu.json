@@ -173,6 +173,20 @@
       "code": "{code} Taldea",
       "members": "{count} kide",
       "members_plural": "{count} kide"
+    },
+    "evaluation": {
+      "status": "Ebaluazioaren Egoera",
+      "inProgress": "Ebaluazioa Abian",
+      "completed": "Ebaluazioa Amaituta",
+      "completedWithErrors": "Ebaluazioa Amaituta (akatsak)",
+      "progress": "Aurrerapena",
+      "pending": "Zain",
+      "processing": "Prozesatzen",
+      "done": "Amaituta",
+      "errors": "Akatsak",
+      "error": "Akatsa",
+      "pleaseWait": "Prozesatzen... Beste orrialde batera nabigatu dezakezu, ebaluazioak jarraituko du.",
+      "someAlreadyProcessing": "{count} bidalketa dagoeneko prozesatzen"
     }
   },
   "errors": {

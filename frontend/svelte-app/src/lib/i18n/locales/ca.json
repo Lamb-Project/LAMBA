@@ -173,6 +173,20 @@
         "code": "Grup {code}",
         "members": "{count} membre",
         "members_plural": "{count} membres"
+      },
+      "evaluation": {
+        "status": "Estat de l'Avaluació",
+        "inProgress": "Avaluació en Progrés",
+        "completed": "Avaluació Completada",
+        "completedWithErrors": "Avaluació Completada (amb errors)",
+        "progress": "Progrés",
+        "pending": "Pendent",
+        "processing": "Processant",
+        "done": "Completat",
+        "errors": "Errors",
+        "error": "Error",
+        "pleaseWait": "Processant... Pots navegar a una altra pàgina, l'avaluació continuarà.",
+        "someAlreadyProcessing": "{count} entrega/es ja s'estan processant"
       }
     },
     "errors": {

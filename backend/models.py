@@ -117,9 +117,17 @@ class FileSubmission(BaseModel):
     uploaded_by_moodle_id: str  # Uploader's Moodle instance ID
     group_code: Optional[str] = None  # Unique code for group submissions
     max_group_members: int = 1  # Max members allowed for this submission
+    # Evaluation status tracking
+    evaluation_status: Optional[str] = None  # null, 'pending', 'processing', 'completed', 'error'
+    evaluation_started_at: Optional[datetime] = None
+    evaluation_error: Optional[str] = None
     
     @field_serializer('uploaded_at')
     def serialize_uploaded_at(self, value: Optional[datetime]) -> Optional[str]:
+        return value.isoformat() + 'Z' if value else None
+    
+    @field_serializer('evaluation_started_at')
+    def serialize_evaluation_started_at(self, value: Optional[datetime]) -> Optional[str]:
         return value.isoformat() + 'Z' if value else None
 
 class StudentSubmission(BaseModel):

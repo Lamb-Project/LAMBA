@@ -1,11 +1,13 @@
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form, BackgroundTasks
 from typing import List
 import logging
+import os
 
 from models import Activity, ActivityCreate, ActivityUpdate, ActivityResponse, StudentActivityView, SubmissionResponse, OptimizedSubmissionView
 from activities_service import ActivitiesService
 from lti_service import LTIGradeService
 from grade_service import GradeService
+from evaluation_service import EvaluationService
 
 router = APIRouter()
 
@@ -277,14 +279,75 @@ async def get_activity_submissions(activity_id: str, request: Request):
 
 # ==================== Evaluación Automática ====================
 
+def is_debug_mode() -> bool:
+    """Check if DEBUG mode is enabled"""
+    return os.getenv('DEBUG', 'false').lower() == 'true'
+
+
+def run_background_evaluation(
+    activity_id: str,
+    activity_moodle_id: str,
+    file_submission_ids: List[str],
+    evaluator_id: str,
+    debug_mode: bool
+):
+    """Background task to process evaluations"""
+    logging.info(f"Starting background evaluation for {len(file_submission_ids)} submissions")
+    try:
+        result = EvaluationService.process_evaluation_batch(
+            activity_id=activity_id,
+            activity_moodle_id=activity_moodle_id,
+            file_submission_ids=file_submission_ids,
+            evaluator_id=evaluator_id,
+            is_debug_mode=debug_mode
+        )
+        logging.info(f"Background evaluation completed: {result['grades_created']} created, {result['grades_updated']} updated, {len(result.get('errors', []))} errors")
+    except Exception as e:
+        logging.error(f"Background evaluation failed: {e}")
+
+
+@router.get("/{activity_id}/evaluation-status")
+async def get_evaluation_status(activity_id: str, request: Request):
+    """Get current evaluation status for an activity's submissions
+    
+    Used for polling to track background evaluation progress.
+    Returns status of each submission and overall progress.
+    """
+    try:
+        lti_data = get_lti_session_data(request)
+        
+        if not check_teacher_role(lti_data):
+            raise HTTPException(status_code=403, detail="Solo profesores pueden ver el estado de evaluación")
+        
+        moodle_id = lti_data.get('tool_consumer_instance_guid', '')
+        if not moodle_id:
+            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+        
+        # Reset any stuck evaluations before returning status
+        EvaluationService.reset_stuck_evaluations(activity_id, moodle_id)
+        
+        status = EvaluationService.get_evaluation_status(activity_id, moodle_id)
+        
+        return {
+            "success": True,
+            **status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error getting evaluation status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+
 @router.post("/{activity_id}/evaluate")
-async def evaluate_activity(activity_id: str, request: Request):
-    """Evalúa automáticamente entregas de una actividad usando LAMB
+async def evaluate_activity(activity_id: str, request: Request, background_tasks: BackgroundTasks):
+    """Inicia evaluación automática en segundo plano para entregas de una actividad usando LAMB
     
-    Acepta un JSON con un array opcional de file_submission_ids.
-    Si no se proporciona, evalúa todas las entregas sin calificación.
+    Acepta un JSON con un array de file_submission_ids.
+    La evaluación se ejecuta en segundo plano - use GET /evaluation-status para seguir el progreso.
     
-    When DEBUG=true in environment, returns additional debug_info with raw AI responses.
+    Returns immediately with the number of submissions queued for evaluation.
     """
     try:
         lti_data = get_lti_session_data(request)
@@ -296,60 +359,58 @@ async def evaluate_activity(activity_id: str, request: Request):
         if not moodle_id:
             raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
         
-        # Try to parse request body for file_submission_ids
-        file_submission_ids = None
+        # Parse request body for file_submission_ids
+        file_submission_ids = []
         try:
             body = await request.json()
-            file_submission_ids = body.get('file_submission_ids')
+            file_submission_ids = body.get('file_submission_ids', [])
         except:
             pass
         
-        logging.info(f"Iniciando evaluación automática de actividad {activity_id}")
-        if file_submission_ids:
-            logging.info(f"Evaluando {len(file_submission_ids)} entregas específicas")
+        if not file_submission_ids:
+            raise HTTPException(status_code=400, detail="Se requiere una lista de file_submission_ids para evaluar")
         
-        evaluation_result = GradeService.create_automatic_evaluation_for_activity(activity_id, moodle_id, file_submission_ids)
+        # Get activity to verify evaluator is configured
+        activity = ActivitiesService.get_activity_by_id(activity_id, moodle_id)
+        if not activity:
+            raise HTTPException(status_code=404, detail="Actividad no encontrada")
         
-        # Extract results from the evaluation
-        grades = evaluation_result.get('grades', [])
-        updated_grades = evaluation_result.get('updated_grades', [])
-        debug_info = evaluation_result.get('debug_info')
-        errors = evaluation_result.get('errors')
-        result_message = evaluation_result.get('message')
+        if not activity.evaluator_id:
+            raise HTTPException(status_code=400, detail="La actividad no tiene un evaluador configurado")
         
-        total_processed = len(grades) + len(updated_grades)
+        logging.info(f"Iniciando evaluación automática de actividad {activity_id} para {len(file_submission_ids)} entregas")
         
-        logging.info(f"Evaluación automática completada para actividad {activity_id}: {len(grades)} nuevas, {len(updated_grades)} actualizadas")
+        # Start evaluation (marks submissions as pending)
+        start_result = EvaluationService.start_evaluation(
+            activity_id=activity_id,
+            activity_moodle_id=moodle_id,
+            file_submission_ids=file_submission_ids,
+            evaluator_id=activity.evaluator_id
+        )
         
-        # Build informative message
-        if result_message:
-            message = result_message
-        elif total_processed > 0:
-            parts = []
-            if len(grades) > 0:
-                parts.append(f"{len(grades)} nueva(s)")
-            if len(updated_grades) > 0:
-                parts.append(f"{len(updated_grades)} actualizada(s)")
-            message = f"Evaluación completada: {' y '.join(parts)}"
-        else:
-            message = "No se encontraron entregas para evaluar"
+        if not start_result['success']:
+            raise HTTPException(status_code=400, detail=start_result['message'])
+        
+        # Queue background task to process evaluations
+        if start_result['queued'] > 0:
+            background_tasks.add_task(
+                run_background_evaluation,
+                activity_id=activity_id,
+                activity_moodle_id=moodle_id,
+                file_submission_ids=start_result['queued_ids'],
+                evaluator_id=activity.evaluator_id,
+                debug_mode=is_debug_mode()
+            )
         
         response = {
             "success": True,
-            "message": message,
-            "grades_created": len(grades),
-            "grades_updated": len(updated_grades),
-            "total_processed": total_processed
+            "message": start_result['message'],
+            "queued": start_result['queued'],
+            "already_processing": len(start_result.get('already_processing', []))
         }
         
-        # Include errors if any
-        if errors:
-            response["errors"] = errors
-            response["message"] += f" ({len(errors)} error(es))"
-        
-        # Include debug_info only when DEBUG=true (debug_info will be None otherwise)
-        if debug_info is not None:
-            response["debug_info"] = debug_info
+        if start_result.get('already_processing'):
+            response["already_processing_ids"] = start_result['already_processing']
         
         return response
         

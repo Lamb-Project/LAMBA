@@ -173,6 +173,20 @@
       "code": "Grupo {code}",
       "members": "{count} miembro",
       "members_plural": "{count} miembros"
+    },
+    "evaluation": {
+      "status": "Estado de Evaluación",
+      "inProgress": "Evaluación en Progreso",
+      "completed": "Evaluación Completada",
+      "completedWithErrors": "Evaluación Completada (con errores)",
+      "progress": "Progreso",
+      "pending": "Pendiente",
+      "processing": "Procesando",
+      "done": "Completado",
+      "errors": "Errores",
+      "error": "Error",
+      "pleaseWait": "Procesando... Puedes navegar a otra página, la evaluación continuará.",
+      "someAlreadyProcessing": "{count} entrega(s) ya están siendo procesadas"
     }
   },
   "errors": {

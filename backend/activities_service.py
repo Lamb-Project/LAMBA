@@ -764,7 +764,10 @@ class ActivitiesService:
             uploaded_by=file_submission.uploaded_by,
             uploaded_by_moodle_id=file_submission.uploaded_by_moodle_id,
             group_code=file_submission.group_code,
-            max_group_members=file_submission.max_group_members
+            max_group_members=file_submission.max_group_members,
+            evaluation_status=file_submission.evaluation_status,
+            evaluation_started_at=file_submission.evaluation_started_at,
+            evaluation_error=file_submission.evaluation_error
         )
         
         # Create StudentSubmission model

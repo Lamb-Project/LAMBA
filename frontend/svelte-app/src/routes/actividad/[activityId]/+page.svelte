@@ -42,13 +42,28 @@
   let evaluationDebugInfo = $state(null);
   let debugInfoExpanded = $state({}); // {index: boolean}
   
+  // Evaluation progress state (background processing)
+  let showEvaluationModal = $state(false);
+  let evaluationStatus = $state(null);  // Current status from polling
+  let pollIntervalId = $state(null);    // Polling interval reference
+  
   // Get activity ID from URL params
   let activityId = $derived($page.params.activityId);
   
   onMount(async () => {
     if (browser && activityId) {
       await Promise.all([loadSubmissions(), checkDebugMode()]);
+      // Check if there's an ongoing evaluation
+      await checkOngoingEvaluation();
     }
+    
+    // Cleanup on unmount
+    return () => {
+      if (pollIntervalId) {
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+      }
+    };
   });
   
   async function checkDebugMode() {
@@ -61,6 +76,70 @@
     } catch (err) {
       console.error('Error checking debug mode:', err);
       debugMode = false;
+    }
+  }
+  
+  async function checkOngoingEvaluation() {
+    try {
+      const response = await ltiAwareFetch(`/api/activities/${activityId}/evaluation-status`);
+      if (response.ok) {
+        const status = await response.json();
+        if (status.overall_status === 'in_progress') {
+          // There's an ongoing evaluation, show modal and start polling
+          evaluationStatus = status;
+          showEvaluationModal = true;
+          startPolling();
+        }
+      }
+    } catch (err) {
+      console.error('Error checking ongoing evaluation:', err);
+    }
+  }
+  
+  function startPolling() {
+    if (pollIntervalId) {
+      clearInterval(pollIntervalId);
+    }
+    pollIntervalId = setInterval(pollEvaluationStatus, 2000); // Poll every 2 seconds
+  }
+  
+  function stopPolling() {
+    if (pollIntervalId) {
+      clearInterval(pollIntervalId);
+      pollIntervalId = null;
+    }
+  }
+  
+  async function pollEvaluationStatus() {
+    try {
+      const response = await ltiAwareFetch(`/api/activities/${activityId}/evaluation-status`);
+      if (response.ok) {
+        const status = await response.json();
+        evaluationStatus = status;
+        
+        // Check if evaluation is complete
+        if (status.overall_status !== 'in_progress') {
+          stopPolling();
+          // Reload submissions to get updated grades
+          await loadSubmissions();
+          // Keep modal open for a moment to show final status
+          setTimeout(() => {
+            showEvaluationModal = false;
+            evaluationStatus = null;
+          }, 2000);
+        }
+      }
+    } catch (err) {
+      console.error('Error polling evaluation status:', err);
+    }
+  }
+  
+  function closeEvaluationModal() {
+    showEvaluationModal = false;
+    // Don't stop polling if still in progress
+    if (evaluationStatus?.overall_status !== 'in_progress') {
+      stopPolling();
+      evaluationStatus = null;
     }
   }
   
@@ -236,47 +315,51 @@
       const result = await response.json();
       
       if (response.ok && result.success) {
-        // Build details message
-        let detailParts = [];
-        if (result.grades_created > 0) {
-          detailParts.push($_('activity.submissions.gradesCreated', { values: { count: result.grades_created } }));
-        }
-        if (result.grades_updated > 0) {
-          detailParts.push($_('activity.submissions.gradesUpdated', { values: { count: result.grades_updated } }));
-        }
-        if (result.errors && result.errors.length > 0) {
-          detailParts.push(`${result.errors.length} error(s)`);
-        }
-        
-        evaluationMessage = {
-          type: result.errors && result.errors.length > 0 ? 'warning' : 'success',
-          message: result.message,
-          details: detailParts.length > 0 ? detailParts.join(' | ') : null
+        // Evaluation started in background - show progress modal
+        evaluationStatus = {
+          overall_status: 'in_progress',
+          counts: {
+            total: result.queued,
+            pending: result.queued,
+            processing: 0,
+            completed: 0,
+            error: 0,
+            not_started: 0
+          },
+          submissions: []
         };
+        showEvaluationModal = true;
         
-        // Store debug info if available (only when DEBUG=true on server)
-        if (result.debug_info && result.debug_info.length > 0) {
-          evaluationDebugInfo = result.debug_info;
-        }
+        // Start polling for status updates
+        startPolling();
         
         // Clear selections
         selectedForEvaluation = {};
         selectAllEvaluation = false;
         
-        // Reload submissions to show new grades
-        await loadSubmissions();
+        // Show message if some were already processing
+        if (result.already_processing > 0) {
+          evaluationMessage = {
+            type: 'info',
+            message: $_('activity.evaluation.someAlreadyProcessing', { values: { count: result.already_processing } }),
+            details: null
+          };
+          setTimeout(() => {
+            evaluationMessage = null;
+          }, 5000);
+        }
       } else {
         evaluationMessage = {
           type: 'error',
           message: result.detail || result.message || $_('errors.connectionError'),
           details: null
         };
+        
+        // Clear message after 10 seconds
+        setTimeout(() => {
+          evaluationMessage = null;
+        }, 10000);
       }
-      
-      // Clear message after 10 seconds (but not debug info - user can dismiss it)
-      setTimeout(() => {
-        evaluationMessage = null;
-      }, 10000);
       
     } catch (err) {
       console.error('Error creating automatic evaluation:', err);
@@ -309,11 +392,19 @@
     
     if (submissionsData.activity_type === 'individual' && submissionsData.submissions) {
       submissionsData.submissions.forEach(submission => {
-        selectedForEvaluation[submission.file_submission.id] = selectAllEvaluation;
+        // Skip submissions that are currently being processed
+        const status = submission.file_submission?.evaluation_status;
+        if (status !== 'pending' && status !== 'processing') {
+          selectedForEvaluation[submission.file_submission.id] = selectAllEvaluation;
+        }
       });
     } else if (submissionsData.activity_type === 'group' && submissionsData.groups) {
       submissionsData.groups.forEach(group => {
-        selectedForEvaluation[group.file_submission.id] = selectAllEvaluation;
+        // Skip groups that are currently being processed
+        const status = group.file_submission?.evaluation_status;
+        if (status !== 'pending' && status !== 'processing') {
+          selectedForEvaluation[group.file_submission.id] = selectAllEvaluation;
+        }
       });
     }
   }
@@ -1056,18 +1147,36 @@
                 <div class="flex items-start justify-between mb-4">
                   <div class="flex-1">
                     <div class="flex items-center space-x-3">
+                      {@const evalStatus = submission.file_submission?.evaluation_status}
+                      {@const isProcessing = evalStatus === 'pending' || evalStatus === 'processing'}
                       <input
                         type="checkbox"
                         id="eval-{submission.file_submission.id}"
                         checked={selectedForEvaluation[submission.file_submission.id] || false}
                         onchange={() => toggleSubmissionSelection(submission.file_submission.id)}
-                        class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded cursor-pointer"
+                        disabled={isProcessing}
+                        class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded {isProcessing ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"
                       />
                       <h4 class="text-lg font-medium text-gray-900">
                         {submission.student_name || submission.student_email || submission.student_submission?.student_id || $_('activity.student.anonymous')}
                       </h4>
                       {#if submission.student_email && submission.student_name}
                         <span class="text-sm text-gray-500">{submission.student_email}</span>
+                      {/if}
+                      <!-- Evaluation status badge -->
+                      {#if evalStatus === 'pending'}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          {$_('activity.evaluation.pending')}
+                        </span>
+                      {:else if evalStatus === 'processing'}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <div class="animate-spin rounded-full h-3 w-3 border-b border-blue-600 mr-1"></div>
+                          {$_('activity.evaluation.processing')}
+                        </span>
+                      {:else if evalStatus === 'error'}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" title={submission.file_submission?.evaluation_error || ''}>
+                          {$_('activity.evaluation.error')}
+                        </span>
                       {/if}
                     </div>
                     
@@ -1164,17 +1273,35 @@
                 <div class="flex items-start justify-between mb-4">
                   <div class="flex-1">
                     <div class="flex items-center space-x-3 mb-3">
+                      {@const evalStatus = group.file_submission?.evaluation_status}
+                      {@const isProcessing = evalStatus === 'pending' || evalStatus === 'processing'}
                       <input
                         type="checkbox"
                         id="eval-{group.file_submission.id}"
                         checked={selectedForEvaluation[group.file_submission.id] || false}
                         onchange={() => toggleSubmissionSelection(group.file_submission.id)}
-                        class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded cursor-pointer"
+                        disabled={isProcessing}
+                        class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded {isProcessing ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"
                       />
                       <h4 class="text-lg font-medium text-gray-900">{$_('activity.group.code', { values: { code: group.group_code } })}</h4>
                       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                         {$_('activity.group.members' + (group.members.length !== 1 ? '_plural' : ''), { values: { count: group.members.length } })}
                       </span>
+                      <!-- Evaluation status badge -->
+                      {#if evalStatus === 'pending'}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          {$_('activity.evaluation.pending')}
+                        </span>
+                      {:else if evalStatus === 'processing'}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <div class="animate-spin rounded-full h-3 w-3 border-b border-blue-600 mr-1"></div>
+                          {$_('activity.evaluation.processing')}
+                        </span>
+                      {:else if evalStatus === 'error'}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" title={group.file_submission?.evaluation_error || ''}>
+                          {$_('activity.evaluation.error')}
+                        </span>
+                      {/if}
                     </div>
                     
                     <!-- File info -->
@@ -1330,4 +1457,182 @@
     </div>
   {/if}
 </div>
+
+<!-- Evaluation Progress Modal -->
+{#if showEvaluationModal && evaluationStatus}
+  <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+      <!-- Background overlay -->
+      <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+      
+      <!-- Modal panel -->
+      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div class="sm:flex sm:items-start">
+            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full sm:mx-0 sm:h-10 sm:w-10
+              {evaluationStatus.overall_status === 'in_progress' ? 'bg-blue-100' : 
+               evaluationStatus.overall_status === 'completed' ? 'bg-green-100' : 
+               evaluationStatus.overall_status === 'completed_with_errors' ? 'bg-yellow-100' : 'bg-gray-100'}">
+              {#if evaluationStatus.overall_status === 'in_progress'}
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              {:else if evaluationStatus.overall_status === 'completed'}
+                <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              {:else if evaluationStatus.overall_status === 'completed_with_errors'}
+                <svg class="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+              {:else}
+                <svg class="h-6 w-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              {/if}
+            </div>
+            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+              <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                {#if evaluationStatus.overall_status === 'in_progress'}
+                  {$_('activity.evaluation.inProgress')}
+                {:else if evaluationStatus.overall_status === 'completed'}
+                  {$_('activity.evaluation.completed')}
+                {:else if evaluationStatus.overall_status === 'completed_with_errors'}
+                  {$_('activity.evaluation.completedWithErrors')}
+                {:else}
+                  {$_('activity.evaluation.status')}
+                {/if}
+              </h3>
+              
+              <!-- Progress Summary -->
+              <div class="mt-4">
+                <div class="flex justify-between text-sm text-gray-600 mb-2">
+                  <span>{$_('activity.evaluation.progress')}</span>
+                  <span>
+                    {(evaluationStatus.counts?.completed || 0) + (evaluationStatus.counts?.error || 0)} / {evaluationStatus.counts?.total || 0}
+                  </span>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                  {@const total = evaluationStatus.counts?.total || 1}
+                  {@const completed = evaluationStatus.counts?.completed || 0}
+                  {@const errors = evaluationStatus.counts?.error || 0}
+                  {@const processing = evaluationStatus.counts?.processing || 0}
+                  {@const completedPct = (completed / total) * 100}
+                  {@const errorPct = (errors / total) * 100}
+                  {@const processingPct = (processing / total) * 100}
+                  
+                  <div class="h-3 rounded-full flex overflow-hidden">
+                    {#if completedPct > 0}
+                      <div class="bg-green-500 h-full transition-all duration-300" style="width: {completedPct}%"></div>
+                    {/if}
+                    {#if errorPct > 0}
+                      <div class="bg-red-500 h-full transition-all duration-300" style="width: {errorPct}%"></div>
+                    {/if}
+                    {#if processingPct > 0}
+                      <div class="bg-blue-500 h-full animate-pulse transition-all duration-300" style="width: {processingPct}%"></div>
+                    {/if}
+                  </div>
+                </div>
+                
+                <!-- Status Legend -->
+                <div class="mt-3 flex flex-wrap gap-3 text-xs">
+                  {#if evaluationStatus.counts?.pending > 0}
+                    <span class="flex items-center">
+                      <span class="w-2 h-2 bg-gray-400 rounded-full mr-1"></span>
+                      {$_('activity.evaluation.pending')}: {evaluationStatus.counts.pending}
+                    </span>
+                  {/if}
+                  {#if evaluationStatus.counts?.processing > 0}
+                    <span class="flex items-center">
+                      <span class="w-2 h-2 bg-blue-500 rounded-full mr-1 animate-pulse"></span>
+                      {$_('activity.evaluation.processing')}: {evaluationStatus.counts.processing}
+                    </span>
+                  {/if}
+                  {#if evaluationStatus.counts?.completed > 0}
+                    <span class="flex items-center">
+                      <span class="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                      {$_('activity.evaluation.done')}: {evaluationStatus.counts.completed}
+                    </span>
+                  {/if}
+                  {#if evaluationStatus.counts?.error > 0}
+                    <span class="flex items-center">
+                      <span class="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
+                      {$_('activity.evaluation.errors')}: {evaluationStatus.counts.error}
+                    </span>
+                  {/if}
+                </div>
+              </div>
+              
+              <!-- Submission Details -->
+              {#if evaluationStatus.submissions && evaluationStatus.submissions.length > 0}
+                <div class="mt-4 max-h-48 overflow-y-auto">
+                  <div class="space-y-2">
+                    {#each evaluationStatus.submissions as sub}
+                      <div class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded text-sm">
+                        <span class="truncate flex-1 mr-2">
+                          {sub.group_code ? `Group ${sub.group_code}` : sub.file_name}
+                        </span>
+                        <span class="flex-shrink-0">
+                          {#if sub.status === 'pending'}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                              {$_('activity.evaluation.pending')}
+                            </span>
+                          {:else if sub.status === 'processing'}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              <div class="animate-spin rounded-full h-3 w-3 border-b border-blue-600 mr-1"></div>
+                              {$_('activity.evaluation.processing')}
+                            </span>
+                          {:else if sub.status === 'completed'}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                              <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                              </svg>
+                              {$_('activity.evaluation.done')}
+                            </span>
+                          {:else if sub.status === 'error' || sub.status === 'timeout'}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title={sub.error || ''}>
+                              <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                              </svg>
+                              {$_('activity.evaluation.error')}
+                            </span>
+                          {:else}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                              {sub.status}
+                            </span>
+                          {/if}
+                        </span>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+        
+        <!-- Modal Footer -->
+        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          {#if evaluationStatus.overall_status !== 'in_progress'}
+            <button
+              type="button"
+              onclick={closeEvaluationModal}
+              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              {$_('common.close')}
+            </button>
+          {:else}
+            <p class="text-sm text-gray-500 flex items-center">
+              <svg class="animate-spin h-4 w-4 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {$_('activity.evaluation.pleaseWait')}
+            </p>
+          {/if}
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
 
