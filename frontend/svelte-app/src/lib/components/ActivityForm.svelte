@@ -162,7 +162,7 @@
         type="text"
         id="title"
         bind:value={title}
-        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] {errors.title ? 'border-red-500' : ''}"
+        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-gray-900 bg-white {errors.title ? 'border-red-500' : ''}"
         placeholder={$_('activity.create.titlePlaceholder')}
         disabled={isSubmitting}
       />
@@ -180,7 +180,7 @@
         id="description"
         bind:value={description}
         rows="4"
-        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] {errors.description ? 'border-red-500' : ''}"
+        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-gray-900 bg-white {errors.description ? 'border-red-500' : ''}"
         placeholder={$_('activity.create.descriptionPlaceholder')}
         disabled={isSubmitting}
       ></textarea>
@@ -232,7 +232,7 @@
           bind:value={maxGroupSize}
           min="2"
           max="20"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] {errors.maxGroupSize ? 'border-red-500' : ''}"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-gray-900 bg-white {errors.maxGroupSize ? 'border-red-500' : ''}"
           disabled={isSubmitting}
         />
         {#if errors.maxGroupSize}
@@ -253,7 +253,7 @@
         id="deadline"
         bind:value={deadline}
         min={new Date().toISOString().slice(0, 16)}
-        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] {errors.deadline ? 'border-red-500' : ''}"
+        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-gray-900 bg-white {errors.deadline ? 'border-red-500' : ''}"
         disabled={isSubmitting}
       />
       {#if errors.deadline}
@@ -273,7 +273,7 @@
           type="text"
           id="evaluatorId"
           bind:value={evaluatorId}
-          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3]"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-gray-900 bg-white"
           placeholder={$_('activity.create.evaluatorIdPlaceholder')}
           disabled={isSubmitting}
         />
