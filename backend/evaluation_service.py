@@ -264,11 +264,20 @@ class EvaluationService:
                     
                     # Call LAMB API
                     try:
+                        logging.info(f"=== CALLING LAMB API ===")
+                        logging.info(f"Evaluator ID: {evaluator_id}")
+                        logging.info(f"Text length: {len(extracted_text)} chars")
+                        logging.info(f"Text preview: {extracted_text[:200]}...")
+                        
                         lamb_response = LAMBAPIService.evaluate_text(
                             text=extracted_text,
                             evaluator_id=evaluator_id
                         )
+                        
+                        logging.info(f"=== LAMB API RESPONSE ===")
+                        logging.info(f"Response: {lamb_response}")
                     except Exception as e:
+                        logging.error(f"LAMB API Exception: {type(e).__name__}: {str(e)}")
                         file_sub.evaluation_status = STATUS_ERROR
                         file_sub.evaluation_error = f"LAMB API error: {str(e)}"
                         db.commit()
@@ -279,7 +288,9 @@ class EvaluationService:
                         continue
                     
                     # Parse response
+                    logging.info(f"=== PARSING RESPONSE ===")
                     parsed = LAMBAPIService.parse_evaluation_response(lamb_response)
+                    logging.info(f"Parsed result: {parsed}")
                     
                     if is_debug_mode:
                         results['debug_info'].append({

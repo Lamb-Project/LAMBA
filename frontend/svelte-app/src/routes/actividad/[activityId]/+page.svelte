@@ -115,6 +115,13 @@
       const response = await ltiAwareFetch(`/api/activities/${activityId}/evaluation-status`);
       if (response.ok) {
         const status = await response.json();
+        console.log('=== EVALUATION STATUS POLL ===');
+        console.log('Status:', status);
+        console.log('Overall status:', status.overall_status);
+        console.log('Counts:', status.counts);
+        if (status.submissions) {
+          console.log('Submissions:', status.submissions);
+        }
         evaluationStatus = status;
         
         // Check if evaluation is complete
@@ -306,6 +313,9 @@
         return;
       }
       
+      console.log('=== STARTING AUTOMATIC EVALUATION ===');
+      console.log('Selected submissions:', selectedSubmissions);
+      
       const response = await ltiAwareFetch(`/api/activities/${activityId}/evaluate`, {
         method: 'POST',
         headers: {
@@ -317,6 +327,9 @@
       });
       
       const result = await response.json();
+      console.log('=== EVALUATION API RESPONSE ===');
+      console.log('Response status:', response.status);
+      console.log('Result:', result);
       
       if (response.ok && result.success) {
         // Evaluation started in background - show progress modal

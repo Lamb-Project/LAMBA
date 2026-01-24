@@ -244,25 +244,60 @@ class LAMBAPIService:
     def parse_evaluation_response(response: Dict[str, Any]) -> Dict[str, Any]:
         """Parsea la respuesta de LAMB API para extraer nota y feedback"""
         try:
+            logging.info(f"=== PARSING LAMB RESPONSE ===")
+            logging.info(f"Response type: {type(response)}")
+            logging.info(f"Response keys: {response.keys() if isinstance(response, dict) else 'N/A'}")
+            logging.info(f"Full response: {response}")
+            
+            # Check if the LAMB API call itself failed
+            if isinstance(response, dict) and response.get('success') == False:
+                error_msg = response.get('error', 'Unknown LAMB API error')
+                logging.error(f"LAMB API returned error: {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'score': None,
+                    'comment': None,
+                    'raw_response': response
+                }
+            
             # First validate the response format
             validation = LAMBAPIService.validate_chat_completions_format(response)
+            logging.info(f"Validation result: {validation}")
             
             content = None
             
-            if 'choices' in response and len(response['choices']) > 0:
+            # Try to extract content from various response formats
+            if 'response' in response and isinstance(response['response'], dict):
+                # Handle wrapped response from evaluate_text
+                inner_response = response['response']
+                logging.info(f"Found inner 'response' key, extracting from it")
+                if 'choices' in inner_response and len(inner_response['choices']) > 0:
+                    choice = inner_response['choices'][0]
+                    content = choice.get('message', {}).get('content') or choice.get('text')
+                    logging.info(f"Extracted content from inner response choices: {content[:200] if content else 'None'}...")
+            
+            if not content and 'choices' in response and len(response['choices']) > 0:
                 choice = response['choices'][0]
                 content = choice.get('message', {}).get('content') or choice.get('text')
-            elif 'content' in response:
+                logging.info(f"Extracted content from choices: {content[:200] if content else 'None'}...")
+            elif not content and 'content' in response:
                 content = response['content']
-            elif 'text' in response:
+                logging.info(f"Extracted content from 'content' key: {content[:200] if content else 'None'}...")
+            elif not content and 'text' in response:
                 content = response['text']
+                logging.info(f"Extracted content from 'text' key: {content[:200] if content else 'None'}...")
             
             if content:
                 result = LAMBAPIService._extract_score_and_feedback(content)
+                result['success'] = True
                 result['json_validation'] = validation
+                logging.info(f"Successfully parsed response. Score: {result.get('score')}")
                 return result
             
+            logging.warning(f"Could not extract content from response. Returning raw response.")
             return {
+                'success': True,  # Not an error, just no structured content
                 'score': None, 
                 'comment': str(response), 
                 'raw_response': response,
@@ -271,7 +306,10 @@ class LAMBAPIService:
                 
         except Exception as e:
             logging.error(f"Error parseando respuesta LAMB: {str(e)}")
+            logging.exception("Full traceback:")
             return {
+                'success': False,
+                'error': f"Error al procesar respuesta: {str(e)}",
                 'score': None, 
                 'comment': f"Error al procesar respuesta: {str(e)}", 
                 'raw_response': response,
