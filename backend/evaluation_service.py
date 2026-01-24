@@ -264,9 +264,9 @@ class EvaluationService:
                     
                     # Call LAMB API
                     try:
-                        lamb_response = LAMBAPIService.evaluate_submission(
-                            evaluator_id=evaluator_id,
-                            submission_text=extracted_text
+                        lamb_response = LAMBAPIService.evaluate_text(
+                            text=extracted_text,
+                            evaluator_id=evaluator_id
                         )
                     except Exception as e:
                         file_sub.evaluation_status = STATUS_ERROR
