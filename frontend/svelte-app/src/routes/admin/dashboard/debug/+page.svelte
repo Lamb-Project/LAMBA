@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { adminAPI } from '$lib/admin';
+  import { adminAPI, adminAuth } from '$lib/admin';
+  import { goto } from '$app/navigation';
   import { _ } from 'svelte-i18n';
 
   /** @type {any} */
@@ -16,6 +17,17 @@
   let verificationError = $state('');
 
   onMount(async () => {
+    // Verify session before loading data to avoid 401 errors
+    try {
+      const session = await adminAuth.checkSession();
+      if (!session?.success) {
+        goto('/admin');
+        return;
+      }
+    } catch {
+      goto('/admin');
+      return;
+    }
     await loadLambDebugInfo();
   });
 
