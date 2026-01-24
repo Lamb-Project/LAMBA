@@ -1174,11 +1174,17 @@
                           {$_('activity.evaluation.processing')}
                         </span>
                       {:else if evalStatus === 'error'}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" title={submission.file_submission?.evaluation_error || ''}>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                           {$_('activity.evaluation.error')}
                         </span>
                       {/if}
                     </div>
+                    
+                    {#if submission.file_submission?.evaluation_error}
+                      <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-700">
+                        <strong>{$_('activity.evaluation.error')}:</strong> {submission.file_submission.evaluation_error}
+                      </div>
+                    {/if}
                     
                     <div class="mt-2 flex items-center space-x-4 text-sm text-gray-600">
                       <button 
@@ -1298,11 +1304,17 @@
                           {$_('activity.evaluation.processing')}
                         </span>
                       {:else if evalStatus === 'error'}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" title={group.file_submission?.evaluation_error || ''}>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                           {$_('activity.evaluation.error')}
                         </span>
                       {/if}
                     </div>
+                    
+                    {#if group.file_submission?.evaluation_error}
+                      <div class="mt-2 mb-3 p-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-700">
+                        <strong>{$_('activity.evaluation.error')}:</strong> {group.file_submission.evaluation_error}
+                      </div>
+                    {/if}
                     
                     <!-- File info -->
                     <div class="mb-3 flex items-center space-x-4 text-sm text-gray-600">
@@ -1466,7 +1478,8 @@
       <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
       
       <!-- Modal panel -->
-      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+      <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+      <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
         <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
           <div class="sm:flex sm:items-start">
             <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full sm:mx-0 sm:h-10 sm:w-10
@@ -1591,12 +1604,17 @@
                               {$_('activity.evaluation.done')}
                             </span>
                           {:else if sub.status === 'error' || sub.status === 'timeout'}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title={sub.error || ''}>
-                              <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                              </svg>
-                              {$_('activity.evaluation.error')}
-                            </span>
+                            <div class="flex flex-col items-end gap-1">
+                              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                                {$_('activity.evaluation.error')}
+                              </span>
+                              {#if sub.error}
+                                <span class="text-xs text-red-600 max-w-[200px] truncate" title={sub.error}>{sub.error}</span>
+                              {/if}
+                            </div>
                           {:else}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
                               {sub.status}
