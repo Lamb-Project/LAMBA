@@ -1,1 +1,12 @@
 @import 'tailwindcss';
+
+/* Ensure base text color is dark for readability */
+body {
+  color: #111827; /* gray-900 */
+}
+
+/* Ensure form inputs have visible text */
+input, textarea, select {
+  color: #111827; /* gray-900 */
+  background-color: #ffffff;
+}

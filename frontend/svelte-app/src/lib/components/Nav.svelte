@@ -72,9 +72,9 @@
             <!-- Image path updated to be relative to static dir -->
             <img src="{base}/img/lamb_1.png" alt="LAMB Logo" class="h-14">
             <div>
-              <div class="text-lg font-bold">
+              <div class="text-lg font-bold text-gray-900">
                 <span>{$_('nav.title')}</span> 
-                <span class="text-xs bg-gray-200 px-1 py-0.5 rounded">v1.0</span>
+                <span class="text-xs bg-gray-200 text-gray-700 px-1 py-0.5 rounded">v1.0</span>
               </div>
               <span class="text-xs text-gray-600">{$_('nav.subtitle')}</span>
             </div>
