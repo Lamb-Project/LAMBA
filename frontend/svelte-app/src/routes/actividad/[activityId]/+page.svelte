@@ -122,11 +122,15 @@
           stopPolling();
           // Reload submissions to get updated grades
           await loadSubmissions();
-          // Keep modal open for a moment to show final status
-          setTimeout(() => {
-            showEvaluationModal = false;
-            evaluationStatus = null;
-          }, 2000);
+          // If completed successfully with no errors, auto-close after a moment
+          // If there are errors, keep modal open so user can review them
+          if (status.overall_status === 'completed' && (!status.counts?.error || status.counts.error === 0)) {
+            setTimeout(() => {
+              showEvaluationModal = false;
+              evaluationStatus = null;
+            }, 2000);
+          }
+          // Otherwise, keep modal open until user dismisses it
         }
       }
     } catch (err) {

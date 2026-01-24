@@ -251,7 +251,7 @@ class EvaluationService:
                     
                     # Extract text from file
                     try:
-                        extracted_text = DocumentExtractor.extract_text(file_sub.file_path)
+                        extracted_text = DocumentExtractor.extract_text_from_file(file_sub.file_path)
                     except Exception as e:
                         file_sub.evaluation_status = STATUS_ERROR
                         file_sub.evaluation_error = f"Error extracting text: {str(e)}"
