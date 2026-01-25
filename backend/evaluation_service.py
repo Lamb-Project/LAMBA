@@ -86,6 +86,7 @@ class EvaluationService:
                 submission_statuses.append({
                     'file_submission_id': sub.id,
                     'group_code': sub.group_code,
+                    'group_display_name': sub.group_display_name,
                     'file_name': sub.file_name,
                     'status': status,
                     'error': sub.evaluation_error,

@@ -44,6 +44,14 @@
       "maxGroupSizeLabel": "Número máximo de alumnos por grupo",
       "maxGroupSizeHint": "Mínimo 2, máximo 20 alumnos",
       "deadlineLabel": "Fecha y hora límite",
+      "languageLabel": "Idioma de la actividad",
+      "languageHint": "Este idioma se usará para toda la interfaz de la actividad (nombres de grupos, etiquetas, etc.)",
+      "languageOptions": {
+        "en": "Inglés",
+        "es": "Español",
+        "ca": "Catalán",
+        "eu": "Euskera"
+      },
       "evaluatorTitle": "Configuración del Evaluador Automático",
       "evaluatorSubtitle": "Identificador del evaluador automático",
       "evaluatorIdLabel": "ID del evaluador",
@@ -115,6 +123,8 @@
       "sent": "Enviado",
       "groupCode": "Código del grupo",
       "shareCode": "Comparte este código con tu grupo para que puedan unirse.",
+      "copyCode": "Copiar Código",
+      "codeCopied": "¡Copiado!",
       "grade": "Calificación",
       "gradeScore": "Nota",
       "gradeFeedback": "Feedback del profesor",
@@ -149,7 +159,10 @@
       "joinButton": "Unirse al grupo",
       "fileTooLarge": "El archivo es demasiado grande (máximo 50MB)",
       "selectFileError": "Selecciona un archivo para enviar",
-      "enterValidCode": "Introduce un código válido"
+      "enterValidCode": "Introduce un código válido",
+      "studentNoteLabel": "Nota para el profesor (opcional)",
+      "studentNotePlaceholder": "Añade una nota o comentario para tu profesor...",
+      "studentNoteHint": "Esta nota será visible para tus profesores al revisar tu entrega."
     },
     "grading": {
       "title": "Evaluación",
@@ -174,13 +187,18 @@
       "acceptAiGrade": "Aceptar Nota IA",
       "acceptAllAiGrades": "Aceptar Todas las Notas IA",
       "accepting": "Aceptando...",
-      "aiGradesAccepted": "Se aceptaron {count} nota(s) IA como notas finales"
+      "aiGradesAccepted": "Se aceptaron {count} nota(s) IA como notas finales",
+      "aiEvaluationInProgress": "Evaluación IA en progreso..."
     },
     "group": {
       "code": "Grupo {code}",
+      "displayName": "{name}",
       "members": "{count} miembro",
-      "members_plural": "{count} miembros"
+      "members_plural": "{count} miembros",
+      "studentNote": "Nota del estudiante",
+      "noStudentNote": "Sin nota"
     },
+    "groupPrefix": "GRUPO",
     "evaluation": {
       "status": "Estado de Evaluación",
       "inProgress": "Evaluación en Progreso",
@@ -193,7 +211,9 @@
       "errors": "Errores",
       "error": "Error",
       "pleaseWait": "Procesando... Puedes navegar a otra página, la evaluación continuará.",
-      "someAlreadyProcessing": "{count} entrega(s) ya están siendo procesadas"
+      "someAlreadyProcessing": "{count} entrega(s) ya están siendo procesadas",
+      "noEvaluatorConfigured": "Configura un ID de Evaluador arriba para habilitar la evaluación automática",
+      "continuesInBackground": "La evaluación continúa en segundo plano"
     }
   },
   "errors": {

@@ -55,6 +55,7 @@ class Activity(BaseModel):
     course_moodle_id: str  # Moodle instance ID (part of course composite key)
     deadline: Optional[datetime] = None  # Fecha y hora límite de entrega
     evaluator_id: Optional[str] = None  # ID del evaluador automático
+    language: str = 'en'  # Activity language (en, es, ca, eu) - set by teacher on first entry
     
     @field_serializer('created_at', 'deadline')
     def serialize_datetimes(self, value: Optional[datetime]) -> Optional[str]:
@@ -67,6 +68,7 @@ class ActivityCreate(BaseModel):
     max_group_size: Optional[int] = None
     deadline: Optional[datetime] = None
     evaluator_id: Optional[str] = None
+    language: str = 'en'  # Activity language (en, es, ca, eu)
     
     @field_validator('activity_type', mode='before')
     @classmethod
@@ -74,6 +76,16 @@ class ActivityCreate(BaseModel):
         """Normalize activity_type to lowercase for case-insensitive validation"""
         if isinstance(v, str):
             return v.lower()
+        return v
+    
+    @field_validator('language', mode='before')
+    @classmethod
+    def normalize_language(cls, v):
+        """Normalize language to lowercase and validate"""
+        if isinstance(v, str):
+            v = v.lower()
+            if v not in ['en', 'es', 'ca', 'eu']:
+                return 'en'  # Default to English if invalid
         return v
 
 class ActivityUpdate(BaseModel):
@@ -121,8 +133,10 @@ class FileSubmission(BaseModel):
     uploaded_at: Optional[datetime] = None
     uploaded_by: str  # User ID who uploaded the file
     uploaded_by_moodle_id: str  # Uploader's Moodle instance ID
-    group_code: Optional[str] = None  # Unique code for group submissions
+    group_code: Optional[str] = None  # Unique code for group submissions (for joining)
+    group_display_name: Optional[str] = None  # Human-readable group name (e.g., GRUPO_1, GROUP_1)
     max_group_members: int = 1  # Max members allowed for this submission
+    student_note: Optional[str] = None  # Note from student to professor when submitting
     # Evaluation status tracking
     evaluation_status: Optional[str] = None  # null, 'pending', 'processing', 'completed', 'error'
     evaluation_started_at: Optional[datetime] = None

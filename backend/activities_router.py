@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form, BackgroundTasks
+from typing import Optional
 from typing import List
 import logging
 import os
@@ -25,12 +26,12 @@ def get_lti_session_data(request: Request) -> dict:
         session_id = request.query_params.get("lti_session")
     
     if not session_id:
-        raise HTTPException(status_code=401, detail="No se encontró sesión LTI activa")
+        raise HTTPException(status_code=401, detail="No se encontrรณ sesiรณn LTI activa")
     
     from main import lti_data_store
     
     if session_id not in lti_data_store:
-        raise HTTPException(status_code=404, detail="Sesión expirada o no encontrada")
+        raise HTTPException(status_code=404, detail="Sesiรณn expirada o no encontrada")
     
     return lti_data_store[session_id]
 
@@ -63,11 +64,11 @@ async def create_activity(activity_data: ActivityCreate, request: Request):
         
         resource_link_id = lti_data.get('resource_link_id', '')
         if not resource_link_id:
-            raise HTTPException(status_code=400, detail="No se encontró resource_link_id en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ resource_link_id en los datos LTI")
         
         moodle_id = lti_data.get('tool_consumer_instance_guid', '')
         if not moodle_id:
-            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ tool_consumer_instance_guid en los datos LTI")
         
         activity = ActivitiesService.create_activity(
             activity_data=activity_data,
@@ -86,7 +87,7 @@ async def create_activity(activity_data: ActivityCreate, request: Request):
         )
         
     except HTTPException:
-        # Propagar errores HTTP tal cual (p.ej. 403 de autorización)
+        # Propagar errores HTTP tal cual (p.ej. 403 de autorizaciรณn)
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -96,7 +97,7 @@ async def create_activity(activity_data: ActivityCreate, request: Request):
 
 @router.get("/{activity_id}", response_model=Activity)
 async def get_activity(activity_id: str, request: Request):
-    """Obtiene una actividad específica por ID"""
+    """Obtiene una actividad especรญfica por ID"""
     try:
         lti_data = get_lti_session_data(request)
         
@@ -105,7 +106,7 @@ async def get_activity(activity_id: str, request: Request):
         
         moodle_id = lti_data.get('tool_consumer_instance_guid', '')
         if not moodle_id:
-            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ tool_consumer_instance_guid en los datos LTI")
         
         activity = ActivitiesService.get_activity_by_id(activity_id, moodle_id)
         
@@ -131,7 +132,7 @@ async def update_activity(activity_id: str, activity_data: ActivityUpdate, reque
         
         moodle_id = lti_data.get('tool_consumer_instance_guid', '')
         if not moodle_id:
-            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ tool_consumer_instance_guid en los datos LTI")
         
         course_id = lti_data.get('context_id', '')
         
@@ -175,7 +176,7 @@ async def get_student_activity_view(activity_id: str, request: Request):
         moodle_id = lti_data.get('tool_consumer_instance_guid', '')
         
         if not moodle_id:
-            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ tool_consumer_instance_guid en los datos LTI")
         
         student_view = ActivitiesService.get_student_activity_view_by_id(
             resource_link_id=activity_id,
@@ -198,9 +199,16 @@ async def get_student_activity_view(activity_id: str, request: Request):
 async def create_submission(
     activity_id: str,
     request: Request,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    student_note: Optional[str] = Form(None)
 ):
-    """Crea una nueva entrega para una actividad"""
+    """Crea una nueva entrega para una actividad
+    
+    Args:
+        activity_id: ID de la actividad
+        file: Archivo a enviar
+        student_note: Nota opcional del estudiante para el profesor(es)
+    """
     try:
         lti_data = get_lti_session_data(request)
         
@@ -237,7 +245,8 @@ async def create_submission(
             course_id=lti_data.get('context_id', ''),
             course_moodle_id=moodle_id,
             student_moodle_id=student_moodle_id,
-            lis_result_sourcedid=lti_data.get('lis_result_sourcedid')
+            lis_result_sourcedid=lti_data.get('lis_result_sourcedid'),
+            student_note=student_note
         )
         
         logging.info(f"Documento entregado: {submission.student_submission.id} por estudiante {lti_data.get('user_id')}")
@@ -265,7 +274,7 @@ async def get_activity_submissions(activity_id: str, request: Request):
         
         moodle_id = lti_data.get('tool_consumer_instance_guid', '')
         if not moodle_id:
-            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ tool_consumer_instance_guid en los datos LTI")
         
         submissions_data = ActivitiesService.get_submissions_by_activity(activity_id, moodle_id)
         
@@ -277,7 +286,7 @@ async def get_activity_submissions(activity_id: str, request: Request):
         logging.error(f"Error obteniendo entregas: {str(e)}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
-# ==================== Evaluación Automática ====================
+# ==================== Evaluaciรณn Automรกtica ====================
 
 def is_debug_mode() -> bool:
     """Check if DEBUG mode is enabled"""
@@ -317,11 +326,11 @@ async def get_evaluation_status(activity_id: str, request: Request):
         lti_data = get_lti_session_data(request)
         
         if not check_teacher_role(lti_data):
-            raise HTTPException(status_code=403, detail="Solo profesores pueden ver el estado de evaluación")
+            raise HTTPException(status_code=403, detail="Solo profesores pueden ver el estado de evaluaciรณn")
         
         moodle_id = lti_data.get('tool_consumer_instance_guid', '')
         if not moodle_id:
-            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ tool_consumer_instance_guid en los datos LTI")
         
         # Reset any stuck evaluations before returning status
         EvaluationService.reset_stuck_evaluations(activity_id, moodle_id)
@@ -342,10 +351,10 @@ async def get_evaluation_status(activity_id: str, request: Request):
 
 @router.post("/{activity_id}/evaluate")
 async def evaluate_activity(activity_id: str, request: Request, background_tasks: BackgroundTasks):
-    """Inicia evaluación automática en segundo plano para entregas de una actividad usando LAMB
+    """Inicia evaluaciรณn automรกtica en segundo plano para entregas de una actividad usando LAMB
     
     Acepta un JSON con un array de file_submission_ids.
-    La evaluación se ejecuta en segundo plano - use GET /evaluation-status para seguir el progreso.
+    La evaluaciรณn se ejecuta en segundo plano - use GET /evaluation-status para seguir el progreso.
     
     Returns immediately with the number of submissions queued for evaluation.
     """
@@ -357,7 +366,7 @@ async def evaluate_activity(activity_id: str, request: Request, background_tasks
         
         moodle_id = lti_data.get('tool_consumer_instance_guid', '')
         if not moodle_id:
-            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ tool_consumer_instance_guid en los datos LTI")
         
         # Parse request body for file_submission_ids
         file_submission_ids = []
@@ -378,7 +387,7 @@ async def evaluate_activity(activity_id: str, request: Request, background_tasks
         if not activity.evaluator_id:
             raise HTTPException(status_code=400, detail="La actividad no tiene un evaluador configurado")
         
-        logging.info(f"Iniciando evaluación automática de actividad {activity_id} para {len(file_submission_ids)} entregas")
+        logging.info(f"Iniciando evaluaciรณn automรกtica de actividad {activity_id} para {len(file_submission_ids)} entregas")
         
         # Start evaluation (marks submissions as pending)
         start_result = EvaluationService.start_evaluation(
@@ -419,18 +428,18 @@ async def evaluate_activity(activity_id: str, request: Request, background_tasks
     except ValueError as e:
         # ValueError is used for validation errors (missing evaluator, model not found, etc.)
         error_msg = str(e)
-        logging.error(f"Error de validación en evaluación automática: {error_msg}")
+        logging.error(f"Error de validaciรณn en evaluaciรณn automรกtica: {error_msg}")
         raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
         error_msg = str(e)
-        logging.error(f"Error en evaluación automática: {error_msg}")
+        logging.error(f"Error en evaluaciรณn automรกtica: {error_msg}")
         # Provide more details for debugging
         raise HTTPException(
             status_code=500, 
-            detail=f"Error en la evaluación automática: {error_msg}. Verifica la configuración del servidor LAMB en /api/admin/debug/lamb"
+            detail=f"Error en la evaluaciรณn automรกtica: {error_msg}. Verifica la configuraciรณn del servidor LAMB en /api/admin/debug/lamb"
         )
 
-# ==================== Sincronización de Calificaciones ====================
+# ==================== Sincronizaciรณn de Calificaciones ====================
 
 @router.post("/{activity_id}/grades/sync")
 async def sync_grades_to_moodle(activity_id: str, request: Request):
@@ -443,9 +452,9 @@ async def sync_grades_to_moodle(activity_id: str, request: Request):
         
         moodle_id = lti_data.get('tool_consumer_instance_guid', '')
         if not moodle_id:
-            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+            raise HTTPException(status_code=400, detail="No se encontrรณ tool_consumer_instance_guid en los datos LTI")
         
-        logging.info(f"Iniciando sincronización de calificaciones para actividad {activity_id}")
+        logging.info(f"Iniciando sincronizaciรณn de calificaciones para actividad {activity_id}")
         
         result = LTIGradeService.send_activity_grades_to_moodle(activity_id, moodle_id)
         

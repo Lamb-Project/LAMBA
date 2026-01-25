@@ -49,7 +49,15 @@
       "evaluatorIdLabel": "Ebaluatzailearen IDa",
       "evaluatorIdPlaceholder": "Ebaluatzailearen IDa (aukerakoa)",
       "creating": "Sortzen...",
-      "createButton": "Jarduera Sortu"
+      "createButton": "Jarduera Sortu",
+      "languageLabel": "Jardueraren hizkuntza",
+      "languageHint": "Hizkuntza hau erabiliko da jardueraren interfaze osorako (talde izenak, etiketak, etab.)",
+      "languageOptions": {
+        "en": "Ingelesa",
+        "es": "Gaztelania",
+        "ca": "Katalana",
+        "eu": "Euskara"
+      }
     },
     "details": {
       "title": "Jarduera",
@@ -149,7 +157,12 @@
       "joinButton": "Taldean sartu",
       "fileTooLarge": "Fitxategia handiegia da (gehienez 50MB)",
       "selectFileError": "Hautatu fitxategi bat bidaltzeko",
-      "enterValidCode": "Sartu kode baliogarri bat"
+      "enterValidCode": "Sartu kode baliogarri bat",
+      "studentNoteLabel": "Oharra irakaslearentzat (aukerakoa)",
+      "studentNotePlaceholder": "Gehitu ohar edo iruzkin bat zure irakaslearentzat...",
+      "studentNoteHint": "Ohar hau zure irakasleek ikusiko dute zure entrega berrikustean.",
+      "copyCode": "Kopiatu Kodea",
+      "codeCopied": "Kopiatuta!"
     },
     "grading": {
       "title": "Ebaluazioa",
@@ -167,12 +180,23 @@
       "savedWithErrors": "{saved} kalifikazio(ak) ondo gorde dira ({failed} huts eginda)",
       "noGradesToSave": "Ez dago kalifikaziorik gordetzeko",
       "errorSaving": "Errorea kalifikazioak gordetzean",
-      "invalidScore": "Entrega baten notak 0 eta 10 artean egon behar du"
+      "invalidScore": "Entrega baten notak 0 eta 10 artean egon behar du",
+      "aiProposed": "IA-k proposatutako nota",
+      "finalScore": "Azken Nota (0-10)",
+      "finalComment": "Azken Iruzkina / Feedbacka",
+      "acceptAiGrade": "Onartu IA Nota",
+      "acceptAllAiGrades": "Onartu IA Nota Guztiak",
+      "accepting": "Onartzen...",
+      "aiGradesAccepted": "{count} IA nota(k) onartu dira azken nota gisa",
+      "aiEvaluationInProgress": "IA ebaluazioa abian..."
     },
     "group": {
       "code": "{code} Taldea",
       "members": "{count} kide",
-      "members_plural": "{count} kide"
+      "members_plural": "{count} kide",
+      "displayName": "{name}",
+      "studentNote": "Ikaslearen oharra",
+      "noStudentNote": "Oharrik gabe"
     },
     "evaluation": {
       "status": "Ebaluazioaren Egoera",
@@ -186,8 +210,11 @@
       "errors": "Akatsak",
       "error": "Akatsa",
       "pleaseWait": "Prozesatzen... Beste orrialde batera nabigatu dezakezu, ebaluazioak jarraituko du.",
-      "someAlreadyProcessing": "{count} bidalketa dagoeneko prozesatzen"
-    }
+      "someAlreadyProcessing": "{count} bidalketa dagoeneko prozesatzen",
+      "noEvaluatorConfigured": "Konfiguratu Ebaluatzaile ID bat goian ebaluazio automatikoa gaitzeko",
+      "continuesInBackground": "Ebaluazioak atzeko planoan jarraitzen du"
+    },
+    "groupPrefix": "TALDEA"
   },
   "errors": {
     "sessionExpired": "Saioa iraungi da. Kargatu orria berriro.",

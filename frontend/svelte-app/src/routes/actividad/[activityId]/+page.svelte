@@ -178,6 +178,10 @@
       
       submissionsData = await response.json();
       
+      // NOTE: Teachers keep their own locale when viewing submissions
+      // Only students have their UI forced to the activity's language
+      // This is handled in +page.svelte for student views
+      
       // Initialize editedGrades with existing grades
       initializeEditedGrades();
       
@@ -459,12 +463,15 @@
   function toggleSelectAll() {
     selectAllEvaluation = !selectAllEvaluation;
     
+    // Create a new object to trigger reactivity in Svelte 5
+    const newSelections = { ...selectedForEvaluation };
+    
     if (submissionsData.activity_type === 'individual' && submissionsData.submissions) {
       submissionsData.submissions.forEach(submission => {
         // Skip submissions that are currently being processed
         const status = submission.file_submission?.evaluation_status;
         if (status !== 'pending' && status !== 'processing') {
-          selectedForEvaluation[submission.file_submission.id] = selectAllEvaluation;
+          newSelections[submission.file_submission.id] = selectAllEvaluation;
         }
       });
     } else if (submissionsData.activity_type === 'group' && submissionsData.groups) {
@@ -472,14 +479,21 @@
         // Skip groups that are currently being processed
         const status = group.file_submission?.evaluation_status;
         if (status !== 'pending' && status !== 'processing') {
-          selectedForEvaluation[group.file_submission.id] = selectAllEvaluation;
+          newSelections[group.file_submission.id] = selectAllEvaluation;
         }
       });
     }
+    
+    // Reassign to trigger reactivity
+    selectedForEvaluation = newSelections;
   }
   
   function toggleSubmissionSelection(fileSubmissionId) {
-    selectedForEvaluation[fileSubmissionId] = !selectedForEvaluation[fileSubmissionId];
+    // Create a new object to trigger reactivity in Svelte 5
+    selectedForEvaluation = {
+      ...selectedForEvaluation,
+      [fileSubmissionId]: !selectedForEvaluation[fileSubmissionId]
+    };
     
     // Update selectAll checkbox if needed
     if (submissionsData.activity_type === 'individual' && submissionsData.submissions) {
@@ -938,6 +952,7 @@
               onclick={createAutomaticEvaluation}
               disabled={creatingEvaluation || Object.values(selectedForEvaluation).filter(Boolean).length === 0 || !submissionsData?.activity?.evaluator_id}
               class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#2271b3] hover:bg-[#195a91] disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              title={!submissionsData?.activity?.evaluator_id ? $_('activity.evaluation.noEvaluatorConfigured') : ''}
             >
               {#if creatingEvaluation}
                 <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -986,6 +1001,24 @@
           </div>
         {/if}
       </div>
+      
+      <!-- Warning: No Evaluator Configured -->
+      {#if !loading && !error && submissionsData && submissionsData.total_submissions > 0 && !submissionsData?.activity?.evaluator_id}
+        <div class="mt-4 p-4 rounded-md bg-amber-50 border border-amber-200">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm font-medium text-amber-800">
+                {$_('activity.evaluation.noEvaluatorConfigured')}
+              </p>
+            </div>
+          </div>
+        </div>
+      {/if}
       
       <!-- Grade Sending Status Message -->
       {#if gradesSentMessage}
@@ -1281,6 +1314,21 @@
                       <span>📊 {formatFileSize(submission.file_submission.file_size)}</span>
                       <span>🕒 {formatDate(submission.file_submission.uploaded_at)}</span>
                     </div>
+                    
+                    <!-- Student Note (if provided) -->
+                    {#if submission.file_submission?.student_note}
+                      <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <div class="flex items-start">
+                          <svg class="w-4 h-4 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                          </svg>
+                          <div>
+                            <p class="text-xs font-medium text-yellow-800 mb-1">{$_('activity.group.studentNote')}</p>
+                            <p class="text-sm text-yellow-700 whitespace-pre-wrap">{submission.file_submission.student_note}</p>
+                          </div>
+                        </div>
+                      </div>
+                    {/if}
                   </div>
                   
                   <div class="ml-4 flex-shrink-0">
@@ -1297,7 +1345,17 @@
                 </div>
                 
                 <!-- Grading Section -->
-                <div class="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
+                <div class="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200 relative {isProcessing ? 'opacity-75' : ''}">
+                  {#if isProcessing}
+                    <!-- AI Evaluation in Progress Overlay -->
+                    <div class="absolute inset-0 bg-blue-50 bg-opacity-50 rounded-md flex items-center justify-center z-10">
+                      <div class="bg-white px-4 py-2 rounded-lg shadow-md flex items-center space-x-2">
+                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                        <span class="text-sm font-medium text-blue-800">{$_('activity.grading.aiEvaluationInProgress')}</span>
+                      </div>
+                    </div>
+                  {/if}
+                  
                   <h5 class="text-sm font-medium text-gray-700 mb-3">{$_('activity.grading.title')}</h5>
                   
                   <!-- AI Proposed Grade (if available) -->
@@ -1313,7 +1371,8 @@
                             updateGrade(submission.file_submission.id, 'score', submission.grade.ai_score?.toString() || '');
                             updateGrade(submission.file_submission.id, 'comment', submission.grade.ai_comment || '');
                           }}
-                          class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          disabled={isProcessing}
                         >
                           {$_('activity.grading.acceptAiGrade')}
                         </button>
@@ -1345,7 +1404,8 @@
                         step="0.1"
                         value={editedGrades[submission.file_submission.id]?.score || ''}
                         oninput={(e) => updateGrade(submission.file_submission.id, 'score', e.target.value)}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm"
+                        disabled={isProcessing}
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder={$_('activity.grading.scorePlaceholder')}
                       />
                     </div>
@@ -1357,8 +1417,9 @@
                         id="comment-{submission.file_submission.id}"
                         value={editedGrades[submission.file_submission.id]?.comment || ''}
                         oninput={(e) => updateGrade(submission.file_submission.id, 'comment', e.target.value)}
+                        disabled={isProcessing}
                         rows={editedGrades[submission.file_submission.id]?.comment ? '10' : '2'}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder={$_('activity.grading.commentPlaceholder')}
                       ></textarea>
                     </div>
@@ -1408,7 +1469,7 @@
                         disabled={isProcessing}
                         class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded {isProcessing ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"
                       />
-                      <h4 class="text-lg font-medium text-gray-900">{$_('activity.group.code', { values: { code: group.group_code } })}</h4>
+                      <h4 class="text-lg font-medium text-gray-900">{group.file_submission.group_display_name || $_('activity.group.code', { values: { code: group.group_code } })}</h4>
                       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                         {$_('activity.group.members' + (group.members.length !== 1 ? '_plural' : ''), { values: { count: group.members.length } })}
                       </span>
@@ -1446,6 +1507,21 @@
                       <span>🕒 {formatDate(group.file_submission.uploaded_at)}</span>
                     </div>
                     
+                    <!-- Student Note (if provided) -->
+                    {#if group.file_submission?.student_note}
+                      <div class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <div class="flex items-start">
+                          <svg class="w-4 h-4 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                          </svg>
+                          <div>
+                            <p class="text-xs font-medium text-yellow-800 mb-1">{$_('activity.group.studentNote')}</p>
+                            <p class="text-sm text-yellow-700 whitespace-pre-wrap">{group.file_submission.student_note}</p>
+                          </div>
+                        </div>
+                      </div>
+                    {/if}
+                    
                     <!-- Group members -->
                     <div class="space-y-2 mb-4">
                       <h5 class="text-sm font-medium text-gray-700">{$_('activity.student.groupMembers')}:</h5>
@@ -1481,7 +1557,17 @@
                 </div>
                 
                 <!-- Grading Section -->
-                <div class="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
+                <div class="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200 relative {isProcessing ? 'opacity-75' : ''}">
+                  {#if isProcessing}
+                    <!-- AI Evaluation in Progress Overlay -->
+                    <div class="absolute inset-0 bg-blue-50 bg-opacity-50 rounded-md flex items-center justify-center z-10">
+                      <div class="bg-white px-4 py-2 rounded-lg shadow-md flex items-center space-x-2">
+                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                        <span class="text-sm font-medium text-blue-800">{$_('activity.grading.aiEvaluationInProgress')}</span>
+                      </div>
+                    </div>
+                  {/if}
+                  
                   <h5 class="text-sm font-medium text-gray-700 mb-3">{$_('activity.grading.groupTitle')}</h5>
                   
                   <!-- AI Proposed Grade (if available) -->
@@ -1497,7 +1583,8 @@
                             updateGrade(group.file_submission.id, 'score', group.grade.ai_score?.toString() || '');
                             updateGrade(group.file_submission.id, 'comment', group.grade.ai_comment || '');
                           }}
-                          class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          disabled={isProcessing}
                         >
                           {$_('activity.grading.acceptAiGrade')}
                         </button>
@@ -1529,7 +1616,8 @@
                         step="0.1"
                         value={editedGrades[group.file_submission.id]?.score || ''}
                         oninput={(e) => updateGrade(group.file_submission.id, 'score', e.target.value)}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm"
+                        disabled={isProcessing}
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder={$_('activity.grading.scorePlaceholder')}
                       />
                     </div>
@@ -1541,8 +1629,9 @@
                         id="comment-{group.file_submission.id}"
                         value={editedGrades[group.file_submission.id]?.comment || ''}
                         oninput={(e) => updateGrade(group.file_submission.id, 'comment', e.target.value)}
+                        disabled={isProcessing}
                         rows={editedGrades[group.file_submission.id]?.comment ? '6' : '2'}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder={$_('activity.grading.commentPlaceholderGroup')}
                       ></textarea>
                     </div>
@@ -1737,7 +1826,7 @@
                       <div class="bg-gray-50 rounded overflow-hidden">
                         <div class="flex items-center justify-between py-2 px-3 text-sm">
                           <span class="truncate flex-1 mr-2">
-                            {sub.group_code ? `Group ${sub.group_code}` : sub.file_name}
+                            {sub.group_display_name || (sub.group_code ? `Group ${sub.group_code}` : sub.file_name)}
                           </span>
                           <span class="flex-shrink-0">
                             {#if sub.status === 'pending'}
@@ -1785,22 +1874,21 @@
         </div>
         
         <!-- Modal Footer -->
-        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-          {#if evaluationStatus.overall_status !== 'in_progress'}
-            <button
-              type="button"
-              onclick={() => closeEvaluationModal()}
-              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
-            >
-              {$_('common.close')}
-            </button>
-          {:else}
-            <p class="text-sm text-gray-500 flex items-center">
+        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse sm:justify-between">
+          <button
+            type="button"
+            onclick={() => closeEvaluationModal()}
+            class="w-full inline-flex justify-center rounded-md border {evaluationStatus.overall_status === 'in_progress' ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' : 'border-transparent bg-blue-600 text-white hover:bg-blue-700'} shadow-sm px-4 py-2 text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+          >
+            {$_('common.close')}
+          </button>
+          {#if evaluationStatus.overall_status === 'in_progress'}
+            <p class="text-sm text-gray-500 flex items-center mt-3 sm:mt-0">
               <svg class="animate-spin h-4 w-4 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              {$_('activity.evaluation.pleaseWait')}
+              {$_('activity.evaluation.continuesInBackground')}
             </p>
           {/if}
         </div>

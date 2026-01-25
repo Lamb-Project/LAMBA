@@ -16,6 +16,15 @@ from db_models import (
 from database import get_db_session
 from grade_service import GradeService
 from storage_service import FileStorageService
+from config import DEFAULT_ACTIVITY_LANGUAGE
+
+# Group prefix mapping for i18n (language -> prefix)
+GROUP_PREFIX_MAP = {
+    'en': 'GROUP',
+    'es': 'GRUPO',
+    'ca': 'GRUP',
+    'eu': 'TALDEA'
+}
 
 class ActivitiesService:
     """
@@ -69,6 +78,11 @@ class ActivitiesService:
             # Ensure filesystem structure exists for this activity
             FileStorageService.ensure_activity_directory(course_moodle_id, course_id, activity_id)
 
+            # Get language from activity_data or use default
+            language = getattr(activity_data, 'language', None) or DEFAULT_ACTIVITY_LANGUAGE
+            if language not in GROUP_PREFIX_MAP:
+                language = DEFAULT_ACTIVITY_LANGUAGE
+            
             db_activity = ActivityDB(
                 id=activity_id,
                 title=activity_data.title.strip(),
@@ -81,7 +95,9 @@ class ActivitiesService:
                 course_id=course_id,
                 course_moodle_id=course_moodle_id,
                 deadline=activity_data.deadline,
-                evaluator_id=activity_data.evaluator_id.strip() if activity_data.evaluator_id else None
+                evaluator_id=activity_data.evaluator_id.strip() if activity_data.evaluator_id else None,
+                language=language,
+                group_counter=0
             )
             
             db.add(db_activity)
@@ -100,16 +116,34 @@ class ActivitiesService:
                 course_id=db_activity.course_id,
                 course_moodle_id=db_activity.course_moodle_id,
                 deadline=db_activity.deadline,
-                evaluator_id=db_activity.evaluator_id
+                evaluator_id=db_activity.evaluator_id,
+                language=db_activity.language
             )
         finally:
             db.close()
     
     @staticmethod
+    def _generate_group_display_name(db: Session, activity: ActivityDB) -> str:
+        """Generate a human-readable group display name based on activity language
+        
+        Format: {PREFIX}_{number} where PREFIX is i18n-ized
+        Examples: GROUP_1, GRUPO_1, GRUP_1, TALDEA_1
+        """
+        # Increment the group counter
+        activity.group_counter = (activity.group_counter or 0) + 1
+        group_number = activity.group_counter
+        
+        # Get the prefix based on activity language
+        prefix = GROUP_PREFIX_MAP.get(activity.language, GROUP_PREFIX_MAP['en'])
+        
+        return f"{prefix}_{group_number}"
+    
+    @staticmethod
     def create_submission(activity_id: str, student_id: str, student_name: str, 
                          student_email: Optional[str], file_name: str, file_content: bytes, 
                          file_size: int, file_type: str, course_id: str, course_moodle_id: str,
-                         student_moodle_id: str, lis_result_sourcedid: Optional[str] = None) -> OptimizedSubmissionView:
+                         student_moodle_id: str, lis_result_sourcedid: Optional[str] = None,
+                         student_note: Optional[str] = None) -> OptimizedSubmissionView:
         """Create a new submission using the optimized storage structure
         
         Args:
@@ -125,6 +159,7 @@ class ActivitiesService:
             course_moodle_id: Moodle instance ID (part of course composite key)
             student_moodle_id: Student's Moodle instance ID (for composite key)
             lis_result_sourcedid: LIS result sourcedid for grade passback
+            student_note: Optional note from student to professor(s)
         """
         db = get_db_session()
         try:
@@ -169,6 +204,9 @@ class ActivitiesService:
                     file_submission.file_size = file_size
                     file_submission.file_type = file_type
                     file_submission.uploaded_at = datetime.now(timezone.utc)
+                    # Update student note if provided
+                    if student_note is not None:
+                        file_submission.student_note = student_note.strip() if student_note else None
                 
                 # Update student submission LTI data
                 if lis_result_sourcedid:
@@ -192,11 +230,13 @@ class ActivitiesService:
             
             # Determine group settings for group activities
             group_code = None
+            group_display_name = None
             max_group_members = 1
             is_group_leader = False
             
             if activity.activity_type == ActivityType.GROUP:
                 group_code = ActivitiesService._generate_group_code(db)
+                group_display_name = ActivitiesService._generate_group_display_name(db, activity)
                 max_group_members = activity.max_group_size
                 is_group_leader = True
             
@@ -222,7 +262,9 @@ class ActivitiesService:
                 uploaded_by=student_id,
                 uploaded_by_moodle_id=course_moodle_id,
                 group_code=group_code,
-                max_group_members=max_group_members
+                group_display_name=group_display_name,
+                max_group_members=max_group_members,
+                student_note=student_note.strip() if student_note else None
             )
             
             # Create student submission (one per student)
@@ -518,7 +560,8 @@ class ActivitiesService:
                         course_id=activity.course_id,
                         course_moodle_id=activity.course_moodle_id,
                         deadline=activity.deadline,
-                        evaluator_id=activity.evaluator_id
+                        evaluator_id=activity.evaluator_id,
+                        language=activity.language
                     ),
                     'activity_type': 'group',
                     'total_submissions': len(groups),
@@ -540,7 +583,8 @@ class ActivitiesService:
                         course_id=activity.course_id,
                         course_moodle_id=activity.course_moodle_id,
                         deadline=activity.deadline,
-                        evaluator_id=activity.evaluator_id
+                        evaluator_id=activity.evaluator_id,
+                        language=activity.language
                     ),
                     'activity_type': 'individual',
                     'total_submissions': len(individual_submissions),
@@ -646,7 +690,7 @@ class ActivitiesService:
     # Unchanged methods from original service
     @staticmethod
     def get_activities_by_course(course_id: str) -> List[Activity]:
-        """Get all activities for a specific course - unchanged"""
+        """Get all activities for a specific course"""
         db = get_db_session()
         try:
             db_activities = db.query(ActivityDB).filter(ActivityDB.course_id == course_id).all()
@@ -663,7 +707,8 @@ class ActivitiesService:
                     course_id=activity.course_id,
                     course_moodle_id=activity.course_moodle_id,
                     deadline=activity.deadline,
-                    evaluator_id=activity.evaluator_id
+                    evaluator_id=activity.evaluator_id,
+                    language=activity.language
                 ) for activity in db_activities
             ]
         finally:
@@ -698,7 +743,8 @@ class ActivitiesService:
                 course_id=db_activity.course_id,
                 course_moodle_id=db_activity.course_moodle_id,
                 deadline=db_activity.deadline,
-                evaluator_id=db_activity.evaluator_id
+                evaluator_id=db_activity.evaluator_id,
+                language=db_activity.language
             )
         finally:
             db.close()
@@ -728,7 +774,8 @@ class ActivitiesService:
                 course_id=db_activity.course_id,
                 course_moodle_id=db_activity.course_moodle_id,
                 deadline=db_activity.deadline,
-                evaluator_id=db_activity.evaluator_id
+                evaluator_id=db_activity.evaluator_id,
+                language=db_activity.language
             )
         finally:
             db.close()
@@ -768,7 +815,9 @@ class ActivitiesService:
             uploaded_by=file_submission.uploaded_by,
             uploaded_by_moodle_id=file_submission.uploaded_by_moodle_id,
             group_code=file_submission.group_code,
+            group_display_name=file_submission.group_display_name,
             max_group_members=file_submission.max_group_members,
+            student_note=file_submission.student_note,
             evaluation_status=file_submission.evaluation_status,
             evaluation_started_at=file_submission.evaluation_started_at,
             evaluation_error=file_submission.evaluation_error
@@ -862,7 +911,8 @@ class ActivitiesService:
                 course_id=db_activity.course_id,
                 course_moodle_id=db_activity.course_moodle_id,
                 deadline=db_activity.deadline,
-                evaluator_id=db_activity.evaluator_id
+                evaluator_id=db_activity.evaluator_id,
+                language=db_activity.language
             )
         finally:
             db.close()

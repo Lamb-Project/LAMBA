@@ -1,12 +1,23 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
-  import { _ } from 'svelte-i18n';
+  import { createEventDispatcher, onMount } from 'svelte';
+  import { _, locale } from 'svelte-i18n';
+  import { get } from 'svelte/store';
   import { ltiAwareFetch } from '$lib/auth.js';
   
   const dispatch = createEventDispatcher();
   
   // Props
   let { initialTitle = '' } = $props();
+  
+  // Supported languages
+  const supportedLanguages = ['en', 'es', 'ca', 'eu'];
+  
+  // Get initial language from current locale (read once, don't react to changes)
+  function getInitialLanguage() {
+    const currentLocale = get(locale) || 'en';
+    const baseLocale = currentLocale.split('-')[0];
+    return supportedLanguages.includes(baseLocale) ? baseLocale : 'en';
+  }
   
   // Form data
   let title = $state(initialTitle);
@@ -15,6 +26,10 @@
   let maxGroupSize = $state(2);
   let deadline = $state('');
   let evaluatorId = $state('');
+  // Activity language is independent from the app's current locale
+  // This only determines what language STUDENTS will see when viewing the activity
+  // It does NOT change the teacher's current UI
+  let activityLanguage = $state(getInitialLanguage());
   
   // Initialize deadline with default value (3 weeks from now at 23:59)
   function getDefaultDeadline() {
@@ -32,7 +47,7 @@
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
   
-  // Set default deadline on component mount using effect
+  // Set default deadline on component mount
   $effect(() => {
     if (!deadline) {
       deadline = getDefaultDeadline();
@@ -92,7 +107,8 @@
         activity_type: activityType,
         max_group_size: activityType === 'group' ? maxGroupSize : null,
         deadline: deadline ? new Date(deadline).toISOString() : null,
-        evaluator_id: evaluatorId.trim() || null
+        evaluator_id: evaluatorId.trim() || null,
+        language: activityLanguage || 'en'
       };
       
       const response = await ltiAwareFetch('/api/activities', {
@@ -113,6 +129,7 @@
         maxGroupSize = 2;
         deadline = getDefaultDeadline();
         evaluatorId = '';
+        activityLanguage = getInitialLanguage();
         errors = {};
         
         // Dispatch success event
@@ -142,6 +159,7 @@
     maxGroupSize = 2;
     deadline = getDefaultDeadline();
     evaluatorId = '';
+    activityLanguage = getInitialLanguage();
     errors = {};
   }
 </script>
@@ -242,6 +260,24 @@
         {/if}
       </div>
     {/if}
+    
+    <!-- Activity Language -->
+    <div>
+      <label for="activityLanguage" class="block text-sm font-medium text-gray-700 mb-1">
+        {$_('activity.create.languageLabel')} <span class="text-red-500">*</span>
+      </label>
+      <select
+        id="activityLanguage"
+        bind:value={activityLanguage}
+        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-gray-900 bg-white"
+        disabled={isSubmitting}
+      >
+        {#each supportedLanguages as lang}
+          <option value={lang}>{$_(`activity.create.languageOptions.${lang}`)}</option>
+        {/each}
+      </select>
+      <p class="mt-1 text-sm text-gray-500">{$_('activity.create.languageHint')}</p>
+    </div>
     
     <!-- Fecha y hora límite -->
     <div>

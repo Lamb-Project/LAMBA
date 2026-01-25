@@ -4,7 +4,7 @@
   import { goto } from '$app/navigation';
   import { fetchLTIData, isStudentRole, isTeacherOrAdminRole, ltiAwareFetch } from '$lib/auth.js';
   import ActivityForm from '$lib/components/ActivityForm.svelte';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import { formatDate, formatFileSize } from '$lib/i18n/formatters.js';
 
   let userRole = $state(null); // 'student', 'teacher', or 'unknown'
@@ -18,6 +18,9 @@
   // File upload
   let fileInput = $state();
   let selectedFile = $state(null);
+  
+  // Student note to professor
+  let studentNote = $state('');
   
   // Group code submission
   let groupCode = $state('');
@@ -86,6 +89,15 @@
 
       studentView = await response.json();
       
+      // Force UI language to activity's language (if activity exists and has a language set)
+      if (studentView?.activity?.language) {
+        const activityLang = studentView.activity.language;
+        // Only change if it's a supported language
+        if (['en', 'es', 'ca', 'eu'].includes(activityLang)) {
+          locale.set(activityLang);
+        }
+      }
+      
       // If student has a group submission, load group members
       if (studentView?.student_submission?.file_submission?.group_code) {
         await loadGroupMembers(studentView.student_submission.file_submission.group_code);
@@ -128,6 +140,10 @@
 
       const formData = new FormData();
       formData.append('file', selectedFile);
+      // Add student note if provided
+      if (studentNote.trim()) {
+        formData.append('student_note', studentNote.trim());
+      }
 
       const response = await ltiAwareFetch(`/api/activities/${studentView.activity.id}/submissions`, {
         method: 'POST',
@@ -139,6 +155,7 @@
       if (response.ok && result.success) {
         uploadSuccess = result.message;
         selectedFile = null;
+        studentNote = ''; // Clear the note
         if (fileInput) {
           fileInput.value = '';
         }
@@ -403,16 +420,65 @@
                   <p><strong>{$_('activity.student.size')}:</strong> {formatFileSize(studentView.student_submission.file_submission.file_size)}</p>
                   <p><strong>{$_('activity.student.sent')}:</strong> {formatDate(studentView.student_submission.file_submission.uploaded_at)}</p>
                   
-                  {#if studentView.activity.activity_type === 'group' && studentView.student_submission.file_submission.group_code}
+                  {#if studentView.activity.activity_type === 'group' && studentView.student_submission.file_submission.group_code && !studentView.student_submission.is_group_leader}
                     <p><strong>{$_('activity.student.groupCode')}:</strong> <span class="font-mono bg-gray-100 px-2 py-1 rounded">{studentView.student_submission.file_submission.group_code}</span></p>
-                    {#if studentView.student_submission.is_group_leader}
-                      <p class="text-xs mt-1">{$_('activity.student.shareCode')}</p>
-                    {/if}
                   {/if}
                 </div>
               </div>
             </div>
           </div>
+          
+          <!-- Prominent Group Code Display for Group Leaders -->
+          {#if studentView.activity.activity_type === 'group' && studentView.student_submission.file_submission.group_code && studentView.student_submission.is_group_leader}
+            <div class="mb-6 p-6 bg-gradient-to-r from-amber-400 to-orange-400 rounded-xl shadow-lg border-4 border-amber-500">
+              <div class="text-center">
+                <div class="flex items-center justify-center mb-3">
+                  <svg class="w-8 h-8 text-amber-900 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                  </svg>
+                  <h3 class="text-xl font-bold text-amber-900">{$_('activity.student.groupCode')}</h3>
+                </div>
+                
+                <!-- Large Code Display -->
+                <div class="bg-white rounded-lg p-4 mb-4 shadow-inner">
+                  <p class="font-mono text-4xl font-black tracking-widest text-gray-900 select-all">
+                    {studentView.student_submission.file_submission.group_code}
+                  </p>
+                </div>
+                
+                <!-- Copy Button -->
+                <button
+                  type="button"
+                  onclick={() => {
+                    navigator.clipboard.writeText(studentView.student_submission.file_submission.group_code);
+                    // Show brief feedback
+                    const btn = event.target;
+                    const originalText = btn.innerText;
+                    btn.innerText = '✓ ' + $_('activity.student.codeCopied');
+                    setTimeout(() => { btn.innerText = originalText; }, 2000);
+                  }}
+                  class="inline-flex items-center px-6 py-3 bg-amber-900 text-white font-bold rounded-lg hover:bg-amber-800 focus:outline-none focus:ring-4 focus:ring-amber-300 transition-all transform hover:scale-105 shadow-md"
+                >
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                  </svg>
+                  {$_('activity.student.copyCode')}
+                </button>
+                
+                <!-- Share Message -->
+                <p class="mt-4 text-amber-900 font-semibold text-lg">
+                  {$_('activity.student.shareCode')}
+                </p>
+                
+                <!-- Group Display Name (if available) -->
+                {#if studentView.student_submission.file_submission.group_display_name}
+                  <p class="mt-2 text-amber-800 text-sm">
+                    {$_('activity.group.displayName', { values: { name: studentView.student_submission.file_submission.group_display_name } })}
+                  </p>
+                {/if}
+              </div>
+            </div>
+          {/if}
 
           <!-- Display Grade if sent to Moodle -->
           {#if studentView.student_submission.student_submission.sent_to_moodle && studentView.student_submission.grade}
@@ -606,6 +672,22 @@
                 </div>
               {/if}
 
+              <!-- Student Note to Professor -->
+              <div>
+                <label for="student-note-individual" class="block text-sm font-medium text-gray-700 mb-2">
+                  {$_('activity.student.studentNoteLabel')}
+                </label>
+                <textarea
+                  id="student-note-individual"
+                  bind:value={studentNote}
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-gray-900 bg-white"
+                  placeholder={$_('activity.student.studentNotePlaceholder')}
+                  disabled={uploading}
+                ></textarea>
+                <p class="mt-1 text-xs text-gray-500">{$_('activity.student.studentNoteHint')}</p>
+              </div>
+
               <button
                 onclick={submitDocument}
                 disabled={!selectedFile || uploading}
@@ -667,6 +749,22 @@
                     </p>
                   </div>
                 {/if}
+
+                <!-- Student Note to Professor (Group) -->
+                <div>
+                  <label for="student-note-group" class="block text-sm font-medium text-gray-700 mb-2">
+                    {$_('activity.student.studentNoteLabel')}
+                  </label>
+                  <textarea
+                    id="student-note-group"
+                    bind:value={studentNote}
+                    rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-gray-900 bg-white"
+                    placeholder={$_('activity.student.studentNotePlaceholder')}
+                    disabled={uploading}
+                  ></textarea>
+                  <p class="mt-1 text-xs text-gray-500">{$_('activity.student.studentNoteHint')}</p>
+                </div>
 
                 <button
                   onclick={submitDocument}

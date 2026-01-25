@@ -57,6 +57,8 @@ class ActivityDB(Base):
     course_id = Column(String, nullable=False)  # Course ID from LTI
     deadline = Column(DateTime, nullable=True)  # Fecha y hora límite de entrega
     evaluator_id = Column(String, nullable=True)  # ID del evaluador automático
+    language = Column(String, nullable=False, default='en')  # Activity language (en, es, ca, eu) - set by teacher on first entry
+    group_counter = Column(Integer, nullable=False, default=0)  # Counter for generating group display names
     
     # Foreign key constraints for composite keys
     __table_args__ = (
@@ -86,8 +88,12 @@ class FileSubmissionDB(Base):
     uploaded_by_moodle_id = Column(String, nullable=False)  # Uploader's Moodle instance ID
     
     # Group information
-    group_code = Column(String, nullable=True)  # Unique code for group submissions
+    group_code = Column(String, nullable=True)  # Unique code for group submissions (for joining)
+    group_display_name = Column(String, nullable=True)  # Human-readable group name (e.g., GRUPO_1, GROUP_1)
     max_group_members = Column(Integer, default=1)  # Max members allowed for this submission
+    
+    # Student note to professor(s)
+    student_note = Column(Text, nullable=True)  # Note from student to professor when submitting
     
     # Evaluation status tracking for background processing
     # Values: null (not evaluated), 'pending', 'processing', 'completed', 'error'
