@@ -103,7 +103,16 @@
       "gradesCreated": "{count} ebaluazio sortu dira",
       "gradesUpdated": "{count} ebaluazio eguneratu dira",
       "selectAllForEvaluation": "Hautatu guztiak ebaluazio automatikorako",
-      "selectSubmissionsToEvaluate": "Hautatu gutxienez entrega bat automatikoki ebaluatzeko"
+      "selectSubmissionsToEvaluate": "Hautatu gutxienez entrega bat automatikoki ebaluatzeko",
+      "sortBy": "Ordenatu",
+      "sortName": "Izena",
+      "sortDate": "Data",
+      "sortGraded": "Kalifikatua",
+      "perPage": "Orrialdeko",
+      "showing": "{from}-{to} erakusten {total}-tik",
+      "previous": "Aurrekoa",
+      "next": "Hurrengoa",
+      "pageOf": "{current}. orria {total}-tik"
     },
     "student": {
       "title": "Jarduera",

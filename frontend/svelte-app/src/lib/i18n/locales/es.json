@@ -103,7 +103,16 @@
       "gradesCreated": "Se crearon {count} evaluaciones",
       "gradesUpdated": "Se actualizaron {count} evaluaciones",
       "selectAllForEvaluation": "Seleccionar todas para evaluar automáticamente",
-      "selectSubmissionsToEvaluate": "Selecciona al menos una entrega para evaluar automáticamente"
+      "selectSubmissionsToEvaluate": "Selecciona al menos una entrega para evaluar automáticamente",
+      "sortBy": "Ordenar por",
+      "sortName": "Nombre",
+      "sortDate": "Fecha",
+      "sortGraded": "Calificado",
+      "perPage": "Por página",
+      "showing": "Mostrando {from}-{to} de {total}",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "pageOf": "Página {current} de {total}"
     },
     "student": {
       "title": "Actividad",

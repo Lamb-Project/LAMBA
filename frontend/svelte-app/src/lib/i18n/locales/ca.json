@@ -103,7 +103,16 @@
       "gradesCreated": "S'han creat {count} avaluacions",
       "gradesUpdated": "S'han actualitzat {count} avaluacions",
       "selectAllForEvaluation": "Seleccionar-ho tot per a l'avaluació automàtica",
-      "selectSubmissionsToEvaluate": "Selecciona almenys un lliurament per avaluar automàticament"
+      "selectSubmissionsToEvaluate": "Selecciona almenys un lliurament per avaluar automàticament",
+      "sortBy": "Ordenar per",
+      "sortName": "Nom",
+      "sortDate": "Data",
+      "sortGraded": "Qualificat",
+      "perPage": "Per pàgina",
+      "showing": "Mostrant {from}-{to} de {total}",
+      "previous": "Anterior",
+      "next": "Següent",
+      "pageOf": "Pàgina {current} de {total}"
     },
     "student": {
       "title": "Activitat",

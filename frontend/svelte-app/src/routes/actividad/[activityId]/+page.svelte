@@ -50,8 +50,101 @@
   let evaluationStatus = $state(null);  // Current status from polling
   let pollIntervalId = $state(null);    // Polling interval reference
   
+  // Pagination and sorting state
+  let currentPage = $state(1);
+  let itemsPerPage = $state(10);
+  let sortBy = $state('date'); // 'name', 'date', 'graded'
+  let sortOrder = $state('desc'); // 'asc', 'desc'
+  
   // Get activity ID from URL params
   let activityId = $derived($page.params.activityId);
+  
+  // Derived: sorted and paginated submissions (for individual activities)
+  let sortedSubmissions = $derived.by(() => {
+    if (!submissionsData?.submissions) return [];
+    const items = [...submissionsData.submissions];
+    
+    items.sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'name') {
+        const nameA = (a.student_name || a.student_email || a.student_submission?.student_id || '').toLowerCase();
+        const nameB = (b.student_name || b.student_email || b.student_submission?.student_id || '').toLowerCase();
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortBy === 'date') {
+        const dateA = new Date(a.file_submission?.uploaded_at || 0);
+        const dateB = new Date(b.file_submission?.uploaded_at || 0);
+        comparison = dateA - dateB;
+      } else if (sortBy === 'graded') {
+        // Graded = has final score, ungraded first when ascending
+        const gradedA = a.grade?.score !== null && a.grade?.score !== undefined ? 1 : 0;
+        const gradedB = b.grade?.score !== null && b.grade?.score !== undefined ? 1 : 0;
+        comparison = gradedA - gradedB;
+      }
+      
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+    
+    return items;
+  });
+  
+  let paginatedSubmissions = $derived.by(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedSubmissions.slice(start, start + itemsPerPage);
+  });
+  
+  let totalSubmissionPages = $derived(Math.ceil((submissionsData?.submissions?.length || 0) / itemsPerPage));
+  
+  // Derived: sorted and paginated groups (for group activities)
+  let sortedGroups = $derived.by(() => {
+    if (!submissionsData?.groups) return [];
+    const items = [...submissionsData.groups];
+    
+    items.sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'name') {
+        const nameA = (a.file_submission?.group_display_name || a.group_code || '').toLowerCase();
+        const nameB = (b.file_submission?.group_display_name || b.group_code || '').toLowerCase();
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortBy === 'date') {
+        const dateA = new Date(a.file_submission?.uploaded_at || 0);
+        const dateB = new Date(b.file_submission?.uploaded_at || 0);
+        comparison = dateA - dateB;
+      } else if (sortBy === 'graded') {
+        const gradedA = a.grade?.score !== null && a.grade?.score !== undefined ? 1 : 0;
+        const gradedB = b.grade?.score !== null && b.grade?.score !== undefined ? 1 : 0;
+        comparison = gradedA - gradedB;
+      }
+      
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+    
+    return items;
+  });
+  
+  let paginatedGroups = $derived.by(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedGroups.slice(start, start + itemsPerPage);
+  });
+  
+  let totalGroupPages = $derived(Math.ceil((submissionsData?.groups?.length || 0) / itemsPerPage));
+  
+  // Helper to reset pagination when sorting changes
+  function handleSortChange(newSortBy) {
+    if (sortBy === newSortBy) {
+      sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortBy = newSortBy;
+      sortOrder = 'desc';
+    }
+    currentPage = 1;
+  }
+  
+  function handleItemsPerPageChange(e) {
+    itemsPerPage = parseInt(e.target.value);
+    currentPage = 1;
+  }
   
   onMount(async () => {
     if (browser && activityId) {
@@ -1237,9 +1330,67 @@
     {:else}
       <div class="overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200">
-          <h3 class="text-lg font-medium text-gray-900">
-            {$_('activity.submissions.found', { values: { count: submissionsData.total_submissions, type: submissionsData.activity_type === 'group' ? $_('activity.submissions.foundGroup') : $_('activity.submissions.foundIndividual') } })}
-          </h3>
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <h3 class="text-lg font-medium text-gray-900">
+              {$_('activity.submissions.found', { values: { count: submissionsData.total_submissions, type: submissionsData.activity_type === 'group' ? $_('activity.submissions.foundGroup') : $_('activity.submissions.foundIndividual') } })}
+            </h3>
+            
+            <!-- Sorting and Pagination Controls -->
+            <div class="flex flex-wrap items-center gap-4">
+              <!-- Sort By -->
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600">{$_('activity.submissions.sortBy')}:</span>
+                <div class="flex rounded-md shadow-sm">
+                  <button
+                    type="button"
+                    onclick={() => handleSortChange('name')}
+                    class="px-3 py-1.5 text-sm font-medium rounded-l-md border {sortBy === 'name' ? 'bg-[#2271b3] text-white border-[#2271b3]' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}"
+                  >
+                    {$_('activity.submissions.sortName')}
+                    {#if sortBy === 'name'}
+                      <span class="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    {/if}
+                  </button>
+                  <button
+                    type="button"
+                    onclick={() => handleSortChange('date')}
+                    class="px-3 py-1.5 text-sm font-medium border-t border-b {sortBy === 'date' ? 'bg-[#2271b3] text-white border-[#2271b3]' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}"
+                  >
+                    {$_('activity.submissions.sortDate')}
+                    {#if sortBy === 'date'}
+                      <span class="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    {/if}
+                  </button>
+                  <button
+                    type="button"
+                    onclick={() => handleSortChange('graded')}
+                    class="px-3 py-1.5 text-sm font-medium rounded-r-md border {sortBy === 'graded' ? 'bg-[#2271b3] text-white border-[#2271b3]' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}"
+                  >
+                    {$_('activity.submissions.sortGraded')}
+                    {#if sortBy === 'graded'}
+                      <span class="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    {/if}
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Items per page -->
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600">{$_('activity.submissions.perPage')}:</span>
+                <select
+                  value={itemsPerPage}
+                  onchange={handleItemsPerPageChange}
+                  class="block w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-[#2271b3] focus:border-[#2271b3]"
+                >
+                  <option value={2}>2</option>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
         
         <!-- Individual Submissions -->
@@ -1247,21 +1398,23 @@
           <div class="divide-y divide-gray-200">
             <!-- Select All Checkbox -->
             {#if submissionsData.submissions && submissionsData.submissions.length > 0}
-              <div class="px-6 py-3 bg-gray-100 border-b border-gray-200 flex items-center">
-                <input
-                  type="checkbox"
-                  id="selectAllIndividual"
-                  checked={selectAllEvaluation}
-                  onchange={toggleSelectAll}
-                  class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded cursor-pointer"
-                />
-                <label for="selectAllIndividual" class="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
-                  {$_('activity.submissions.selectAllForEvaluation')}
-                </label>
+              <div class="px-6 py-3 bg-gray-100 border-b border-gray-200 flex items-center justify-between">
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="selectAllIndividual"
+                    checked={selectAllEvaluation}
+                    onchange={toggleSelectAll}
+                    class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded cursor-pointer"
+                  />
+                  <label for="selectAllIndividual" class="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
+                    {$_('activity.submissions.selectAllForEvaluation')}
+                  </label>
+                </div>
               </div>
             {/if}
             
-            {#each submissionsData.submissions as submission (submission.student_submission.id)}
+            {#each paginatedSubmissions as submission (submission.student_submission.id)}
               {@const evalStatus = submission.file_submission?.evaluation_status}
               {@const isProcessing = evalStatus === 'pending' || evalStatus === 'processing'}
               <div class="p-6 hover:bg-gray-50">
@@ -1433,6 +1586,42 @@
               </div>
             {/each}
           </div>
+          
+          <!-- Pagination Controls for Individual -->
+          {#if totalSubmissionPages > 1}
+            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+              <div class="text-sm text-gray-600">
+                {$_('activity.submissions.showing', { 
+                  values: { 
+                    from: (currentPage - 1) * itemsPerPage + 1, 
+                    to: Math.min(currentPage * itemsPerPage, submissionsData.submissions.length), 
+                    total: submissionsData.submissions.length 
+                  } 
+                })}
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  onclick={() => currentPage = Math.max(1, currentPage - 1)}
+                  disabled={currentPage === 1}
+                  class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {$_('activity.submissions.previous')}
+                </button>
+                <span class="text-sm text-gray-600">
+                  {$_('activity.submissions.pageOf', { values: { current: currentPage, total: totalSubmissionPages } })}
+                </span>
+                <button
+                  type="button"
+                  onclick={() => currentPage = Math.min(totalSubmissionPages, currentPage + 1)}
+                  disabled={currentPage === totalSubmissionPages}
+                  class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {$_('activity.submissions.next')}
+                </button>
+              </div>
+            </div>
+          {/if}
         {/if}
         
         <!-- Group Submissions -->
@@ -1440,21 +1629,23 @@
           <div class="divide-y divide-gray-200">
             <!-- Select All Checkbox -->
             {#if submissionsData.groups && submissionsData.groups.length > 0}
-              <div class="px-6 py-3 bg-gray-100 border-b border-gray-200 flex items-center">
-                <input
-                  type="checkbox"
-                  id="selectAllGroup"
-                  checked={selectAllEvaluation}
-                  onchange={toggleSelectAll}
-                  class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded cursor-pointer"
-                />
-                <label for="selectAllGroup" class="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
-                  {$_('activity.submissions.selectAllForEvaluation')}
-                </label>
+              <div class="px-6 py-3 bg-gray-100 border-b border-gray-200 flex items-center justify-between">
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="selectAllGroup"
+                    checked={selectAllEvaluation}
+                    onchange={toggleSelectAll}
+                    class="h-4 w-4 text-[#2271b3] focus:ring-[#2271b3] border-gray-300 rounded cursor-pointer"
+                  />
+                  <label for="selectAllGroup" class="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
+                    {$_('activity.submissions.selectAllForEvaluation')}
+                  </label>
+                </div>
               </div>
             {/if}
             
-            {#each submissionsData.groups as group (group.group_code)}
+            {#each paginatedGroups as group (group.group_code)}
               {@const evalStatus = group.file_submission?.evaluation_status}
               {@const isProcessing = evalStatus === 'pending' || evalStatus === 'processing'}
               <div class="p-6 hover:bg-gray-50">
@@ -1645,6 +1836,42 @@
               </div>
             {/each}
           </div>
+          
+          <!-- Pagination Controls for Groups -->
+          {#if totalGroupPages > 1}
+            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+              <div class="text-sm text-gray-600">
+                {$_('activity.submissions.showing', { 
+                  values: { 
+                    from: (currentPage - 1) * itemsPerPage + 1, 
+                    to: Math.min(currentPage * itemsPerPage, submissionsData.groups.length), 
+                    total: submissionsData.groups.length 
+                  } 
+                })}
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  onclick={() => currentPage = Math.max(1, currentPage - 1)}
+                  disabled={currentPage === 1}
+                  class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {$_('activity.submissions.previous')}
+                </button>
+                <span class="text-sm text-gray-600">
+                  {$_('activity.submissions.pageOf', { values: { current: currentPage, total: totalGroupPages } })}
+                </span>
+                <button
+                  type="button"
+                  onclick={() => currentPage = Math.min(totalGroupPages, currentPage + 1)}
+                  disabled={currentPage === totalGroupPages}
+                  class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {$_('activity.submissions.next')}
+                </button>
+              </div>
+            </div>
+          {/if}
         {/if}
       </div>
     {/if}
