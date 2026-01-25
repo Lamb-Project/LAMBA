@@ -312,9 +312,22 @@ class EvaluationService:
                         })
                         continue
                     
-                    # Create or update grade
-                    score = parsed.get('score', 0)
-                    comment = parsed.get('feedback', '')
+                    # Get score and comment from parsed response
+                    score = parsed.get('score')
+                    comment = parsed.get('comment', '') or ''
+                    
+                    # If no score was extracted, treat as error
+                    if score is None:
+                        logging.warning(f"No score found in LAMB response for submission {file_sub_id}")
+                        logging.warning(f"Raw response: {parsed.get('raw_response', 'N/A')}")
+                        file_sub.evaluation_status = STATUS_ERROR
+                        file_sub.evaluation_error = "LAMB response did not contain a valid score (expected 'NOTA FINAL: X.X' or 'FINAL SCORE: X.X')"
+                        db.commit()
+                        results['errors'].append({
+                            'file_submission_id': file_sub_id,
+                            'error': f"No score in LAMB response. Comment received: {comment[:200] if comment else 'None'}..."
+                        })
+                        continue
                     
                     existing_grade = db.query(GradeDB).filter(
                         GradeDB.file_submission_id == file_sub_id
