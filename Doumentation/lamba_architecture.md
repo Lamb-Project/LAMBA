@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Project** | LAMBA - Learning Activities & Machine-Based Assessment |
-| **Version** | 1.0.0 |
-| **Last Updated** | January 2026 |
+| **Version** | 1.1.0 |
+| **Last Updated** | January 25, 2026 |
 | **Architecture Style** | Monolithic with service layers |
 
 ---
@@ -94,7 +94,7 @@
 |-------|------------|---------|
 | **Frontend** | SvelteKit 2.x + Svelte 5 | Reactive UI framework |
 | **Styling** | Tailwind CSS | Utility-first CSS |
-| **i18n** | svelte-i18n | Internationalization |
+| **i18n** | svelte-i18n | Internationalization (EN, ES, CA, EU) |
 | **Backend** | FastAPI (Python 3.8+) | REST API server |
 | **ORM** | SQLAlchemy | Database abstraction |
 | **Database** | SQLite | Persistent storage |
@@ -158,9 +158,15 @@ app = FastAPI(
 │  └── update_activity()           Modify activity settings       │
 │                                                                  │
 │  GradeService                                                   │
-│  ├── create_or_update_grade()    Save/update grade              │
+│  ├── create_or_update_grade()    Save/update final grade        │
 │  ├── get_grade_by_file_submission() Retrieve grade              │
-│  └── evaluate_submission()       Trigger AI evaluation          │
+│  └── _db_grade_to_model()        Convert DB grade to API model  │
+│                                                                  │
+│  EvaluationService (Background Processing)                      │
+│  ├── start_evaluation()          Queue submissions for AI eval  │
+│  ├── process_evaluation()        Background worker (thread)     │
+│  ├── get_evaluation_status()     Poll evaluation progress       │
+│  └── Saves to ai_score/ai_comment (not final grade)            │
 │                                                                  │
 │  LTIGradeService                                                │
 │  ├── send_grade_to_moodle()      Single grade passback          │
@@ -243,6 +249,9 @@ app = FastAPI(
 │ FK uploaded_by_moodle_id                                        │
 │    group_code             ◄── 8-char code for groups            │
 │    max_group_members                                             │
+│    evaluation_status      ◄── pending/processing/completed/error│
+│    evaluation_started_at  ◄── For timeout detection             │
+│    evaluation_error       ◄── Error message if failed           │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
             ┌───────────────────┼───────────────────┐
@@ -254,14 +263,14 @@ app = FastAPI(
 ├─────────────────────────┤     │     ├─────────────────────────┤
 │ PK id (varchar)         │     │     │ PK id (varchar)         │
 │ FK file_submission_id   │◄────┘     │ FK file_submission_id   │
-│ FK student_id           │           │    score (float)        │ ◄── 0-10
-│ FK student_moodle_id    │           │    comment (text)       │
-│    activity_id          │           │    created_at           │
-│    activity_moodle_id   │           └─────────────────────────┘
-│    lis_result_sourcedid │ ◄── For grade passback
-│    joined_at            │
-│    sent_to_moodle       │ ◄── Boolean flag
-│    sent_to_moodle_at    │
+│ FK student_id           │           │    ai_score (float?)    │ ◄── AI proposed (0-10)
+│ FK student_moodle_id    │           │    ai_comment (text?)   │ ◄── AI feedback
+│    activity_id          │           │    ai_evaluated_at      │
+│    activity_moodle_id   │           │    score (float?)       │ ◄── Final grade (0-10)
+│    lis_result_sourcedid │ ◄── For   │    comment (text?)      │ ◄── Professor feedback
+│    joined_at            │   grade   │    created_at           │
+│    sent_to_moodle       │   pass-   │    updated_at           │
+│    sent_to_moodle_at    │   back    └─────────────────────────┘
 └─────────────────────────┘
 ```
 
@@ -302,7 +311,8 @@ frontend/svelte-app/src/routes/
         ├── grades/           # Grade management
         ├── courses/          # Course management
         ├── files/            # File management
-        └── moodle/           # Moodle instances
+        ├── moodle/           # Moodle instances
+        └── debug/            # LAMB API debugging tools
 ```
 
 #### 2.3.2 Component Architecture
@@ -330,9 +340,10 @@ lib/
     ├── index.js             # i18n configuration
     ├── formatters.js        # Date/size formatters
     └── locales/
-        ├── ca.json          # Catalan translations
+        ├── en.json          # English translations (default)
         ├── es.json          # Spanish translations
-        └── en.json          # English translations
+        ├── ca.json          # Catalan translations
+        └── eu.json          # Basque translations
 ```
 
 #### 2.3.3 State Management
@@ -416,38 +427,99 @@ session_id = hashlib.md5(
     │              │              │              │              │
 
     ═══════════════════════════════════════════════════════════════
-    │ TEACHER TRIGGERS EVALUATION                                  │
+    │ TEACHER TRIGGERS EVALUATION (Background Processing)         │
     ═══════════════════════════════════════════════════════════════
 
 ┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐
 │Teacher │     │Frontend│     │ Backend│     │Doc Ext.│     │ LAMB   │
 └───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘
     │              │              │              │              │
-    │ Click Evaluate              │              │              │
+    │ Select & Click Evaluate    │              │              │
     │─────────────►│              │              │              │
     │              │              │              │              │
     │              │ POST /api/activities/{id}/evaluate         │
     │              │─────────────►│              │              │
     │              │              │              │              │
-    │              │              │ For each submission:        │
-    │              │              │──────────────►│              │
-    │              │              │ Extract text │              │
-    │              │              │◄──────────────│              │
+    │              │              │ Start background thread     │
+    │              │ {success, queued: N}        │              │
+    │              │◄─────────────│              │              │
     │              │              │              │              │
-    │              │              │ POST /chat/completions      │
-    │              │              │─────────────────────────────►│
+    │  Show modal  │              │ (Background) For each:      │
+    │◄─────────────│              │──────────────►│              │
+    │              │              │ Extract text │              │
+    │              │ Poll status  │◄──────────────│              │
+    │              │─────────────►│              │              │
+    │              │ {status}     │ POST /chat/completions      │
+    │              │◄─────────────│─────────────────────────────►│
     │              │              │              │              │
     │              │              │    Score + Feedback         │
     │              │              │◄─────────────────────────────│
     │              │              │              │              │
     │              │              │ Parse "NOTA FINAL: X.X"     │
-    │              │              │ Create Grade │              │
+    │              │              │ Save to ai_score/ai_comment │
+    │              │              │ (NOT final grade)           │
     │              │              │              │              │
-    │              │ {grades_created: N}         │              │
+    │ Modal shows  │◄─────────────│              │              │
+    │ AI grades    │              │              │              │
+    │              │              │              │              │
+    
+    ═══════════════════════════════════════════════════════════════
+    │ TEACHER ACCEPTS AI GRADES (Optional)                        │
+    ═══════════════════════════════════════════════════════════════
+    │              │              │              │              │
+    │ Click "Accept All AI Grades"              │              │
+    │─────────────►│              │              │              │
+    │              │ POST /api/grades/activity/{id}/accept-ai-grades
+    │              │─────────────►│              │              │
+    │              │              │ Copy ai_score → score       │
+    │              │              │ Copy ai_comment → comment   │
+    │              │ {updated: N} │              │              │
     │◄─────────────│◄─────────────│              │              │
 ```
 
-### 3.3 Grade Passback to Moodle
+### 3.3 Dual Grading System
+
+LAMBA implements a two-stage grading workflow:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    GRADING WORKFLOW                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Stage 1: AI Evaluation                                         │
+│  ─────────────────────                                          │
+│  • Teacher triggers evaluation                                  │
+│  • LAMB API returns score + feedback                            │
+│  • Saved to: ai_score, ai_comment, ai_evaluated_at             │
+│  • Final grade (score, comment) remains NULL                    │
+│                                                                  │
+│  Stage 2: Professor Review                                      │
+│  ─────────────────────────                                      │
+│  • Professor sees AI proposed grade (read-only, blue box)      │
+│  • Options:                                                     │
+│    a) "Accept AI Grade" - copies ai_score → score              │
+│    b) "Accept All AI Grades" - bulk copy for all submissions   │
+│    c) Manually enter different score/comment                    │
+│  • Final grade saved to: score, comment                         │
+│                                                                  │
+│  Stage 3: LMS Sync                                              │
+│  ────────────────────                                           │
+│  • Only 'score' (final grade) is sent to Moodle via LTI        │
+│  • ai_score is never sent to LMS                               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Grade Model Fields**:
+| Field | Type | Description |
+|-------|------|-------------|
+| `ai_score` | float (nullable) | AI proposed score (0-10) |
+| `ai_comment` | text (nullable) | AI feedback/explanation |
+| `ai_evaluated_at` | datetime | When AI evaluation completed |
+| `score` | float (nullable) | Professor's final score (0-10) |
+| `comment` | text (nullable) | Professor's final feedback |
+
+### 3.4 Grade Passback to Moodle
 
 ```
 ┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐
@@ -503,18 +575,21 @@ signature = HMAC-SHA1(consumer_secret + "&", base_string)
 |--------|----------|------|-------------|
 | `POST` | `/lti` | None | LTI launch entry point |
 | `GET` | `/api/lti-data` | LTI Cookie | Get session data |
+| `GET` | `/api/debug-mode` | LTI Cookie | Check if debug mode enabled |
 | `POST` | `/api/activities` | LTI (Teacher) | Create activity |
 | `GET` | `/api/activities/{id}` | LTI (Teacher) | Get activity |
 | `PUT` | `/api/activities/{id}` | LTI (Teacher) | Update activity |
 | `GET` | `/api/activities/{id}/view` | LTI (Student) | Student activity view |
 | `GET` | `/api/activities/{id}/submissions` | LTI (Teacher) | List submissions |
 | `POST` | `/api/activities/{id}/submissions` | LTI (Student) | Submit file |
-| `POST` | `/api/activities/{id}/evaluate` | LTI (Teacher) | Trigger AI evaluation |
-| `POST` | `/api/activities/{id}/grades/sync` | LTI (Teacher) | Sync grades to Moodle |
+| `POST` | `/api/activities/{id}/evaluate` | LTI (Teacher) | Trigger AI evaluation (background) |
+| `GET` | `/api/activities/{id}/evaluation-status` | LTI (Teacher) | Poll evaluation progress |
+| `POST` | `/api/activities/{id}/grades/sync` | LTI (Teacher) | Sync final grades to Moodle |
 | `GET` | `/api/submissions/me` | LTI (Student) | Get own submission |
 | `POST` | `/api/submissions/join` | LTI (Student) | Join group with code |
 | `GET` | `/api/submissions/{id}/members` | LTI | Get group members |
-| `POST` | `/api/grades/{submission_id}` | LTI (Teacher) | Create/update grade |
+| `POST` | `/api/grades/{submission_id}` | LTI (Teacher) | Create/update final grade |
+| `POST` | `/api/grades/activity/{id}/accept-ai-grades` | LTI (Teacher) | Accept all AI grades as final |
 | `GET` | `/api/downloads/{path}` | LTI (Teacher) | Download file |
 | `POST` | `/api/admin/login` | Credentials | Admin login |
 | `POST` | `/api/admin/logout` | Admin Cookie | Admin logout |
