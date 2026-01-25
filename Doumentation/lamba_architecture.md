@@ -5,15 +5,23 @@
 | Field | Value |
 |-------|-------|
 | **Project** | LAMBA - Learning Activities & Machine-Based Assessment |
-| **Version** | 1.1.0 |
+| **Version** | 1.2.0 |
 | **Last Updated** | January 25, 2026 |
 | **Architecture Style** | Monolithic with service layers |
 
 ---
 
-## 1. Architecture Overview
+## 1. Project Overview
 
-### 1.1 High-Level Architecture
+### 1.1 What is LAMBA?
+
+LAMBA is an **LTI 1.1 Tool Provider** that integrates with Moodle (or any LMS supporting LTI) to provide:
+- **Activity creation** for teachers (individual or group assignments)
+- **File submission** for students
+- **AI-powered automatic evaluation** using the LAMB platform
+- **Grade passback** to the LMS via LTI Outcome Service
+
+### 1.2 High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -54,11 +62,7 @@
 │  │  ┌─────────────────────────────────────────────────────────────────┐ │   │
 │  │  │                       SERVICE LAYER                              │ │   │
 │  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │ │   │
-│  │  │  │Activities│  │   User   │  │  Course  │  │  Moodle  │        │ │   │
-│  │  │  │ Service  │  │ Service  │  │ Service  │  │ Service  │        │ │   │
-│  │  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │ │   │
-│  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │ │   │
-│  │  │  │  Grade   │  │   LTI    │  │  Storage │  │ LAMB API │        │ │   │
+│  │  │  │Activities│  │Evaluation│  │  Grade   │  │  LAMB API│        │ │   │
 │  │  │  │ Service  │  │ Service  │  │ Service  │  │ Service  │        │ │   │
 │  │  │  └──────────┘  └──────────┘  └──────────┘  └────┬─────┘        │ │   │
 │  │  └──────────────────────────────────────────────────┼──────────────┘ │   │
@@ -88,11 +92,11 @@
                                   └─────────────────────────────────────────┘
 ```
 
-### 1.2 Technology Stack
+### 1.3 Technology Stack
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Frontend** | SvelteKit 2.x + Svelte 5 | Reactive UI framework |
+| **Frontend** | SvelteKit 2.x + Svelte 5 | Reactive UI framework with `$state` runes |
 | **Styling** | Tailwind CSS | Utility-first CSS |
 | **i18n** | svelte-i18n | Internationalization (EN, ES, CA, EU) |
 | **Backend** | FastAPI (Python 3.8+) | REST API server |
@@ -103,94 +107,72 @@
 
 ---
 
-## 2. System Components
-
-### 2.1 Backend Architecture
-
-#### 2.1.1 Application Entry Point (`main.py`)
-
-```python
-# Core responsibilities:
-# - FastAPI application initialization
-# - Router registration
-# - CORS middleware configuration
-# - LTI session management
-# - Static file serving (SPA)
-
-app = FastAPI(
-    title="LAMBA",
-    description="Learning Activities & Machine-Based Assessment",
-    version="1.0.0",
-    lifespan=lifespan  # Database initialization
-)
-
-# Routers mounted at:
-# /api/activities - Activity CRUD operations
-# /api/submissions - Submission management
-# /api/grades - Grade operations
-# /api/admin/* - Administration endpoints
-# /lti - LTI launch endpoint
-# /api/lti-data - Session data retrieval
-```
-
-#### 2.1.2 Router Layer
-
-| Router | File | Prefix | Description |
-|--------|------|--------|-------------|
-| Activities | `activities_router.py` | `/api/activities` | CRUD for activities, submissions, evaluation |
-| Submissions | `submissions_router.py` | `/api/submissions` | Student submission operations |
-| Grades | `grades_router.py` | `/api/grades` | Grade management |
-| Admin | `admin_router.py` | `/api/admin` | Administration operations |
-
-#### 2.1.3 Service Layer
+## 2. Directory Structure
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        SERVICE LAYER                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ActivitiesService                                              │
-│  ├── create_activity()           Create new activity            │
-│  ├── create_submission()         Handle file uploads            │
-│  ├── submit_with_group_code()    Join existing group            │
-│  ├── get_student_submission()    Retrieve student's work        │
-│  ├── get_submissions_by_activity() List all submissions         │
-│  └── update_activity()           Modify activity settings       │
-│                                                                  │
-│  GradeService                                                   │
-│  ├── create_or_update_grade()    Save/update final grade        │
-│  ├── get_grade_by_file_submission() Retrieve grade              │
-│  └── _db_grade_to_model()        Convert DB grade to API model  │
-│                                                                  │
-│  EvaluationService (Background Processing)                      │
-│  ├── start_evaluation()          Queue submissions for AI eval  │
-│  ├── process_evaluation()        Background worker (thread)     │
-│  ├── get_evaluation_status()     Poll evaluation progress       │
-│  └── Saves to ai_score/ai_comment (not final grade)            │
-│                                                                  │
-│  LTIGradeService                                                │
-│  ├── send_grade_to_moodle()      Single grade passback          │
-│  └── send_activity_grades_to_moodle() Batch grade sync          │
-│                                                                  │
-│  LAMBAPIService                                                 │
-│  ├── verify_model_exists()       Check evaluator availability   │
-│  ├── evaluate_text()             Call LAMB /chat/completions    │
-│  └── parse_evaluation_response() Extract score from response    │
-│                                                                  │
-│  FileStorageService                                             │
-│  ├── save_submission_file()      Persist uploaded file          │
-│  ├── ensure_activity_directory() Create folder structure        │
-│  └── sanitize_filename()         Safe filename generation       │
-│                                                                  │
-│  UserService / CourseService / MoodleService                    │
-│  └── create_or_update_*()        Entity management              │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+/opt/LAMBA/
+├── backend/
+│   ├── main.py                 # FastAPI app entry point, LTI endpoints
+│   ├── config.py               # Environment variable loading
+│   ├── database.py             # SQLAlchemy engine and session
+│   ├── db_models.py            # SQLAlchemy ORM models
+│   ├── models.py               # Pydantic API models
+│   │
+│   ├── activities_router.py    # Activity CRUD, submissions, evaluation endpoints
+│   ├── activities_service.py   # Activity business logic
+│   ├── submissions_router.py   # Student submission endpoints
+│   ├── grades_router.py        # Grade management endpoints
+│   ├── grade_service.py        # Grade business logic
+│   ├── admin_router.py         # Admin dashboard endpoints
+│   ├── admin_service.py        # Admin business logic
+│   │
+│   ├── evaluation_service.py   # Background AI evaluation management
+│   ├── lamb_api_service.py     # LAMB API client (AI evaluation)
+│   ├── lti_service.py          # LTI grade passback (OAuth 1.0a)
+│   │
+│   ├── document_extractor.py   # Text extraction (PDF, DOCX, TXT)
+│   ├── storage_service.py      # File storage management
+│   ├── user_service.py         # User CRUD
+│   ├── course_service.py       # Course CRUD
+│   ├── moodle_service.py       # Moodle instance CRUD
+│   │
+│   ├── uploads/                # Student file submissions
+│   ├── lamba.db                # SQLite database
+│   ├── requirements.txt        # Python dependencies
+│   └── .env                    # Environment configuration
+│
+├── frontend/
+│   └── svelte-app/
+│       ├── src/
+│       │   ├── routes/
+│       │   │   ├── +page.svelte          # Main page (role-based)
+│       │   │   ├── +layout.svelte        # Root layout
+│       │   │   ├── actividad/
+│       │   │   │   └── [activityId]/
+│       │   │   │       └── +page.svelte  # Teacher: submissions view
+│       │   │   └── admin/
+│       │   │       └── dashboard/        # Admin panel pages
+│       │   │
+│       │   └── lib/
+│       │       ├── auth.js               # LTI session management
+│       │       ├── admin.js              # Admin API client
+│       │       ├── components/           # Reusable components
+│       │       └── i18n/                 # Internationalization
+│       │           └── locales/          # Translation files (en, es, ca, eu)
+│       │
+│       └── static/                       # Static assets
+│
+└── Documentation/
+    ├── lamba_architecture.md             # This file
+    ├── prd.md                            # Product Requirements
+    └── lamb-project-docs/                # LAMB platform docs
 ```
 
-### 2.2 Data Layer
+---
 
-#### 2.2.1 Database Schema (ERD)
+## 3. Database Schema
+
+### 3.1 Entity Relationship Diagram
 
 ```
 ┌─────────────────────┐       ┌─────────────────────┐
@@ -218,7 +200,7 @@ app = FastAPI(
                               ┌─────────────────────┐
                               │     activities      │
                               ├─────────────────────┤
-                              │ PK id (varchar)     │
+                              │ PK id (varchar)     │ ◄── resource_link_id from LTI
                               │ PK course_moodle_id │
                               │    title            │
                               │    description      │
@@ -249,7 +231,7 @@ app = FastAPI(
 │ FK uploaded_by_moodle_id                                        │
 │    group_code             ◄── 8-char code for groups            │
 │    max_group_members                                             │
-│    evaluation_status      ◄── pending/processing/completed/error│
+│    evaluation_status      ◄── null/pending/processing/completed/error │
 │    evaluation_started_at  ◄── For timeout detection             │
 │    evaluation_error       ◄── Error message if failed           │
 └───────────────────────────────┬─────────────────────────────────┘
@@ -274,7 +256,7 @@ app = FastAPI(
 └─────────────────────────┘
 ```
 
-#### 2.2.2 Multi-Tenancy Model
+### 3.2 Multi-Tenancy Model
 
 LAMBA uses **composite primary keys** to ensure complete isolation between Moodle instances:
 
@@ -288,631 +270,666 @@ class ActivityDB(Base):
 # Activity ID "123" from Moodle B
 ```
 
-### 2.3 Frontend Architecture
-
-#### 2.3.1 Route Structure
-
-```
-frontend/svelte-app/src/routes/
-├── +page.svelte              # Main page (role-based: create activity / submit)
-├── +layout.svelte            # Root layout with language selector
-├── +error.svelte             # Error boundary
-├── actividad/
-│   └── [activityId]/
-│       └── +page.svelte      # Activity detail (teacher: submissions list)
-└── admin/
-    ├── +page.svelte          # Admin login
-    ├── +layout.svelte        # Admin layout with sidebar
-    └── dashboard/
-        ├── +page.svelte      # Dashboard overview
-        ├── activities/       # Activity management
-        ├── users/            # User management
-        ├── submissions/      # Submission management
-        ├── grades/           # Grade management
-        ├── courses/          # Course management
-        ├── files/            # File management
-        ├── moodle/           # Moodle instances
-        └── debug/            # LAMB API debugging tools
-```
-
-#### 2.3.2 Component Architecture
-
-```
-lib/
-├── auth.js                   # LTI authentication utilities
-│   ├── fetchLTIData()       # Get current session data
-│   ├── isStudentRole()      # Role checking
-│   └── isTeacherOrAdminRole()
-│
-├── admin.js                  # Admin API client
-│   ├── login()
-│   ├── logout()
-│   └── checkSession()
-│
-├── components/
-│   ├── Nav.svelte           # Main navigation bar
-│   ├── AdminNav.svelte      # Admin sidebar navigation
-│   ├── ActivityForm.svelte  # Activity creation form
-│   ├── DataTable.svelte     # Reusable data table
-│   └── LanguageSelector.svelte
-│
-└── i18n/
-    ├── index.js             # i18n configuration
-    ├── formatters.js        # Date/size formatters
-    └── locales/
-        ├── en.json          # English translations (default)
-        ├── es.json          # Spanish translations
-        ├── ca.json          # Catalan translations
-        └── eu.json          # Basque translations
-```
-
-#### 2.3.3 State Management
-
-LAMBA uses Svelte 5's native reactivity with `$state` runes:
-
-```svelte
-<script>
-  // Reactive state declarations
-  let userRole = $state(null);
-  let loading = $state(true);
-  let error = $state(null);
-  
-  // Derived computations
-  let isTeacher = $derived(userRole === 'teacher');
-</script>
-```
+**Key relationships:**
+- All entities reference `moodle_id` as part of their composite key
+- `activity.id` = LTI `resource_link_id` (unique per Moodle instance)
+- `course.id` = LTI `context_id` (unique per Moodle instance)
+- `user.id` = LTI `user_id` (unique per Moodle instance)
 
 ---
 
-## 3. Key Workflows
+## 4. API Reference
 
-### 3.1 LTI Launch Sequence
-
-```
-┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐
-│ Moodle │     │ LAMBA  │     │ Session│     │  DB    │
-│  LMS   │     │ Server │     │ Store  │     │        │
-└───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘
-    │              │              │              │
-    │ POST /lti    │              │              │
-    │ (LTI params) │              │              │
-    │─────────────►│              │              │
-    │              │              │              │
-    │              │ Generate session_id         │
-    │              │──────────────►│              │
-    │              │              │              │
-    │              │ Create/Update Moodle instance
-    │              │─────────────────────────────►│
-    │              │              │              │
-    │              │ Create/Update User          │
-    │              │─────────────────────────────►│
-    │              │              │              │
-    │              │ Create/Update Course        │
-    │              │─────────────────────────────►│
-    │              │              │              │
-    │  303 Redirect│              │              │
-    │  + Set Cookie│              │              │
-    │◄─────────────│              │              │
-    │              │              │              │
-```
-
-**Session ID Generation**:
-```python
-session_id = hashlib.md5(
-    f"{user_id}_{context_id}_{resource_link_id}".encode()
-).hexdigest()
-```
-
-### 3.2 Submission & Evaluation Flow
-
-```
-┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐
-│Student │     │Frontend│     │ Backend│     │ Storage│     │ LAMB   │
-└───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘
-    │              │              │              │              │
-    │ Select file  │              │              │              │
-    │─────────────►│              │              │              │
-    │              │              │              │              │
-    │              │ POST /api/activities/{id}/submissions      │
-    │              │─────────────►│              │              │
-    │              │              │              │              │
-    │              │              │ Save file   │              │
-    │              │              │─────────────►│              │
-    │              │              │              │              │
-    │              │              │ Create FileSubmission       │
-    │              │              │ Create StudentSubmission    │
-    │              │              │              │              │
-    │              │  Success     │              │              │
-    │◄─────────────│◄─────────────│              │              │
-    │              │              │              │              │
-
-    ═══════════════════════════════════════════════════════════════
-    │ TEACHER TRIGGERS EVALUATION (Background Processing)         │
-    ═══════════════════════════════════════════════════════════════
-
-┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐
-│Teacher │     │Frontend│     │ Backend│     │Doc Ext.│     │ LAMB   │
-└───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘
-    │              │              │              │              │
-    │ Select & Click Evaluate    │              │              │
-    │─────────────►│              │              │              │
-    │              │              │              │              │
-    │              │ POST /api/activities/{id}/evaluate         │
-    │              │─────────────►│              │              │
-    │              │              │              │              │
-    │              │              │ Start background thread     │
-    │              │ {success, queued: N}        │              │
-    │              │◄─────────────│              │              │
-    │              │              │              │              │
-    │  Show modal  │              │ (Background) For each:      │
-    │◄─────────────│              │──────────────►│              │
-    │              │              │ Extract text │              │
-    │              │ Poll status  │◄──────────────│              │
-    │              │─────────────►│              │              │
-    │              │ {status}     │ POST /chat/completions      │
-    │              │◄─────────────│─────────────────────────────►│
-    │              │              │              │              │
-    │              │              │    Score + Feedback         │
-    │              │              │◄─────────────────────────────│
-    │              │              │              │              │
-    │              │              │ Parse "NOTA FINAL: X.X"     │
-    │              │              │ Save to ai_score/ai_comment │
-    │              │              │ (NOT final grade)           │
-    │              │              │              │              │
-    │ Modal shows  │◄─────────────│              │              │
-    │ AI grades    │              │              │              │
-    │              │              │              │              │
-    
-    ═══════════════════════════════════════════════════════════════
-    │ TEACHER ACCEPTS AI GRADES (Optional)                        │
-    ═══════════════════════════════════════════════════════════════
-    │              │              │              │              │
-    │ Click "Accept All AI Grades"              │              │
-    │─────────────►│              │              │              │
-    │              │ POST /api/grades/activity/{id}/accept-ai-grades
-    │              │─────────────►│              │              │
-    │              │              │ Copy ai_score → score       │
-    │              │              │ Copy ai_comment → comment   │
-    │              │ {updated: N} │              │              │
-    │◄─────────────│◄─────────────│              │              │
-```
-
-### 3.3 Dual Grading System
-
-LAMBA implements a two-stage grading workflow:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    GRADING WORKFLOW                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Stage 1: AI Evaluation                                         │
-│  ─────────────────────                                          │
-│  • Teacher triggers evaluation                                  │
-│  • LAMB API returns score + feedback                            │
-│  • Saved to: ai_score, ai_comment, ai_evaluated_at             │
-│  • Final grade (score, comment) remains NULL                    │
-│                                                                  │
-│  Stage 2: Professor Review                                      │
-│  ─────────────────────────                                      │
-│  • Professor sees AI proposed grade (read-only, blue box)      │
-│  • Options:                                                     │
-│    a) "Accept AI Grade" - copies ai_score → score              │
-│    b) "Accept All AI Grades" - bulk copy for all submissions   │
-│    c) Manually enter different score/comment                    │
-│  • Final grade saved to: score, comment                         │
-│                                                                  │
-│  Stage 3: LMS Sync                                              │
-│  ────────────────────                                           │
-│  • Only 'score' (final grade) is sent to Moodle via LTI        │
-│  • ai_score is never sent to LMS                               │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Grade Model Fields**:
-| Field | Type | Description |
-|-------|------|-------------|
-| `ai_score` | float (nullable) | AI proposed score (0-10) |
-| `ai_comment` | text (nullable) | AI feedback/explanation |
-| `ai_evaluated_at` | datetime | When AI evaluation completed |
-| `score` | float (nullable) | Professor's final score (0-10) |
-| `comment` | text (nullable) | Professor's final feedback |
-
-### 3.4 Grade Passback to Moodle
-
-```
-┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐
-│Teacher │     │ LAMBA  │     │ LTI    │     │ Moodle │
-└───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘
-    │              │              │              │
-    │ Click Sync   │              │              │
-    │─────────────►│              │              │
-    │              │              │              │
-    │              │ For each graded submission: │
-    │              │              │              │
-    │              │ Build XML    │              │
-    │              │─────────────►│              │
-    │              │              │              │
-    │              │ Sign with OAuth 1.0a       │
-    │              │─────────────►│              │
-    │              │              │              │
-    │              │              │ POST replaceResult
-    │              │              │─────────────►│
-    │              │              │              │
-    │              │              │   Success   │
-    │              │              │◄─────────────│
-    │              │              │              │
-    │              │ Mark sent_to_moodle = true │
-    │              │              │              │
-    │  Summary     │              │              │
-    │◄─────────────│              │              │
-```
-
-**OAuth Signature Generation**:
-```python
-# 1. Normalize URL
-normalized_url = scheme://host:port/path (no query)
-
-# 2. Sort and encode parameters
-params = oauth_consumer_key, oauth_nonce, oauth_signature_method,
-         oauth_timestamp, oauth_version, oauth_body_hash
-
-# 3. Build base string
-base_string = "POST&{url}&{params}"
-
-# 4. Sign with HMAC-SHA1
-signature = HMAC-SHA1(consumer_secret + "&", base_string)
-```
-
----
-
-## 4. API Design
-
-### 4.1 RESTful Endpoint Summary
+### 4.1 LTI Endpoints (main.py)
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `POST` | `/lti` | None | LTI launch entry point |
-| `GET` | `/api/lti-data` | LTI Cookie | Get session data |
+| `GET` | `/api/lti-data` | LTI Cookie/Header | Get session data |
 | `GET` | `/api/debug-mode` | LTI Cookie | Check if debug mode enabled |
-| `POST` | `/api/activities` | LTI (Teacher) | Create activity |
-| `GET` | `/api/activities/{id}` | LTI (Teacher) | Get activity |
-| `PUT` | `/api/activities/{id}` | LTI (Teacher) | Update activity |
-| `GET` | `/api/activities/{id}/view` | LTI (Student) | Student activity view |
-| `GET` | `/api/activities/{id}/submissions` | LTI (Teacher) | List submissions |
-| `POST` | `/api/activities/{id}/submissions` | LTI (Student) | Submit file |
-| `POST` | `/api/activities/{id}/evaluate` | LTI (Teacher) | Trigger AI evaluation (background) |
-| `GET` | `/api/activities/{id}/evaluation-status` | LTI (Teacher) | Poll evaluation progress |
-| `POST` | `/api/activities/{id}/grades/sync` | LTI (Teacher) | Sync final grades to Moodle |
-| `GET` | `/api/submissions/me` | LTI (Student) | Get own submission |
-| `POST` | `/api/submissions/join` | LTI (Student) | Join group with code |
-| `GET` | `/api/submissions/{id}/members` | LTI | Get group members |
-| `POST` | `/api/grades/{submission_id}` | LTI (Teacher) | Create/update final grade |
-| `POST` | `/api/grades/activity/{id}/accept-ai-grades` | LTI (Teacher) | Accept all AI grades as final |
-| `GET` | `/api/downloads/{path}` | LTI (Teacher) | Download file |
-| `POST` | `/api/admin/login` | Credentials | Admin login |
-| `POST` | `/api/admin/logout` | Admin Cookie | Admin logout |
-| `GET` | `/api/admin/statistics` | Admin Cookie | Dashboard stats |
-| `GET` | `/api/admin/*` | Admin Cookie | Entity listings |
+| `GET` | `/api/downloads/{path}` | LTI (Teacher) | Download submission file |
 
-### 4.2 Authentication Mechanisms
+### 4.2 Activities Router (`/api/activities`)
 
-#### LTI Session (Students & Teachers)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/` | LTI (Teacher) | Create activity |
+| `GET` | `/{id}` | LTI (Teacher) | Get activity |
+| `PUT` | `/{id}` | LTI (Teacher) | Update activity |
+| `GET` | `/{id}/view` | LTI (Student) | Student activity view |
+| `GET` | `/{id}/submissions` | LTI (Teacher) | List all submissions |
+| `POST` | `/{id}/submissions` | LTI (Student) | Submit file |
+| `POST` | `/{id}/evaluate` | LTI (Teacher) | Start AI evaluation (background) |
+| `GET` | `/{id}/evaluation-status` | LTI (Teacher) | Poll evaluation progress |
+| `POST` | `/{id}/grades/sync` | LTI (Teacher) | Sync grades to Moodle |
+
+### 4.3 Submissions Router (`/api/submissions`)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/me` | LTI (Student) | Get own submission |
+| `POST` | `/join` | LTI (Student) | Join group with code |
+| `GET` | `/{id}/members` | LTI | Get group members |
+
+### 4.4 Grades Router (`/api/grades`)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/{submission_id}` | LTI (Teacher) | Create/update final grade |
+| `POST` | `/activity/{id}/accept-ai-grades` | LTI (Teacher) | Accept all AI grades as final |
+
+### 4.5 Admin Router (`/api/admin`)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/login` | Credentials | Admin login |
+| `POST` | `/logout` | Admin Cookie | Admin logout |
+| `GET` | `/check-session` | Admin Cookie | Verify session |
+| `GET` | `/statistics` | Admin Cookie | Dashboard stats |
+| `GET` | `/moodle-instances` | Admin Cookie | List Moodle instances |
+| `GET` | `/courses` | Admin Cookie | List courses |
+| `GET` | `/activities` | Admin Cookie | List activities |
+| `GET` | `/users` | Admin Cookie | List users |
+| `GET` | `/submissions` | Admin Cookie | List submissions |
+| `GET` | `/files` | Admin Cookie | List files |
+| `GET` | `/grades` | Admin Cookie | List grades |
+| `GET` | `/debug/lamb` | Admin Cookie | LAMB API debug info |
+| `POST` | `/debug/lamb/verify-model` | Admin Cookie | Verify LAMB model |
+
+---
+
+## 5. Service Layer Details
+
+### 5.1 ActivitiesService (`activities_service.py`)
+
+**Purpose:** Core business logic for activities and submissions.
+
+**Key Methods:**
 ```python
-# Cookie-based session
-@app.post("/lti")
-async def process_lti_launch(request: Request):
-    # ... validate LTI params ...
-    response.set_cookie(
-        key="lti_session",
-        value=session_id,
-        httponly=True,
-        secure=is_https,
-        samesite="lax",
-        max_age=3600  # 1 hour
-    )
+class ActivitiesService:
+    @staticmethod
+    def create_activity(activity_data, user_id, course_id, course_moodle_id, activity_id) -> Activity
+    
+    @staticmethod
+    def create_submission(activity_id, student_id, student_name, student_email, 
+                         file_name, file_content, file_size, file_type, 
+                         course_id, course_moodle_id, student_moodle_id, 
+                         lis_result_sourcedid) -> OptimizedSubmissionView
+    
+    @staticmethod
+    def submit_with_group_code(activity_id, group_code, student_id, ...) -> OptimizedSubmissionView
+    
+    @staticmethod
+    def get_submissions_by_activity(activity_id, activity_moodle_id) -> Dict[str, Any]
+    # Returns: {activity, activity_type, total_submissions, submissions/groups}
 ```
 
-#### Admin Session
+### 5.2 EvaluationService (`evaluation_service.py`)
+
+**Purpose:** Manages background AI evaluation jobs.
+
+**Key Methods:**
 ```python
-@router.post("/api/admin/login")
-async def admin_login(credentials, response):
-    # Validate against ADMIN_USERNAME/ADMIN_PASSWORD
-    response.set_cookie(
-        key="admin_session",
-        value=session_token,
-        httponly=True,
-        secure=is_https,
-        max_age=86400  # 24 hours
-    )
+class EvaluationService:
+    @staticmethod
+    def start_evaluation(activity_id, activity_moodle_id, file_submission_ids, evaluator_id) -> Dict
+    # Marks submissions as 'pending', returns immediately
+    
+    @staticmethod
+    def process_evaluation_batch(activity_id, activity_moodle_id, file_submission_ids, 
+                                  evaluator_id, is_debug_mode) -> Dict
+    # Runs in background thread, calls LAMB API for each submission
+    
+    @staticmethod
+    def get_evaluation_status(activity_id, activity_moodle_id, file_submission_ids) -> Dict
+    # Returns current status for polling
+    
+    @staticmethod
+    def reset_stuck_evaluations(activity_id, activity_moodle_id) -> int
+    # Resets evaluations stuck > 5 minutes
 ```
 
-### 4.3 Response Format Standards
-
-**Success Response**:
-```json
-{
-  "success": true,
-  "message": "Operation completed",
-  "data": { ... }
-}
+**Evaluation Status Flow:**
+```
+null → pending → processing → completed
+                     ↓
+                   error
 ```
 
-**Error Response**:
-```json
-{
-  "detail": "Error description"
-}
+### 5.3 LAMBAPIService (`lamb_api_service.py`)
+
+**Purpose:** Client for the LAMB AI evaluation API.
+
+**Key Methods:**
+```python
+class LAMBAPIService:
+    LAMB_API_URL = os.getenv('LAMB_API_URL')
+    LAMB_BEARER_TOKEN = os.getenv('LAMB_BEARER_TOKEN')
+    LAMB_TIMEOUT = int(os.getenv('LAMB_TIMEOUT', '30'))
+    
+    @staticmethod
+    def verify_model_exists(evaluator_id) -> Dict[str, Any]
+    # Checks if lamb_assistant.{evaluator_id} exists
+    
+    @staticmethod
+    def evaluate_text(text, evaluator_id, timeout) -> Dict[str, Any]
+    # Calls /chat/completions with extracted text
+    
+    @staticmethod
+    def parse_evaluation_response(response) -> Dict[str, Any]
+    # Extracts score and feedback from AI response
+    
+    @staticmethod
+    def _extract_score_and_feedback(content) -> Dict[str, Any]
+    # Regex patterns to find score in various formats
 ```
 
-**List Response**:
-```json
-{
-  "success": true,
-  "data": [ ... ],
-  "count": 42
-}
+**Score Extraction Patterns:**
+The `_extract_score_and_feedback` method searches for grades in these formats (in order):
+1. `NOTA FINAL: X.X` or `FINAL SCORE: X.X`
+2. `Nota: X.X`, `## Nota: X.X`, `**Nota:** X.X` (Spanish with markdown)
+3. `Score: X.X`, `Grade: X.X`, `Puntuación: X.X`, `Calificación: X.X`
+4. `X.X/10` pattern at end of text (fallback)
+
+### 5.4 GradeService (`grade_service.py`)
+
+**Purpose:** Grade CRUD operations.
+
+**Key Methods:**
+```python
+class GradeService:
+    @staticmethod
+    def create_or_update_grade(file_submission_id, score, comment) -> Grade
+    # Updates final grade (score, comment)
+    
+    @staticmethod
+    def get_grade_by_file_submission(file_submission_id) -> Optional[Grade]
+```
+
+### 5.5 LTIGradeService (`lti_service.py`)
+
+**Purpose:** LTI 1.1 grade passback to Moodle.
+
+**Key Methods:**
+```python
+class LTIGradeService:
+    @staticmethod
+    def send_grade_to_moodle(lis_result_sourcedid, lis_outcome_service_url,
+                             oauth_consumer_key, oauth_consumer_secret,
+                             score, comment) -> Dict[str, Any]
+    # Sends single grade via OAuth 1.0a signed XML
+    
+    @staticmethod
+    def send_activity_grades_to_moodle(activity_id, activity_moodle_id) -> Dict[str, Any]
+    # Sends all graded submissions for an activity
+```
+
+**Grade Normalization:**
+- Input: 0-10 scale (LAMBA internal)
+- Output: 0-1 scale (LTI standard)
+- Conversion: `normalized_score = score / 10.0`
+
+---
+
+## 6. AI Evaluation Workflow
+
+### 6.1 Complete Flow Diagram
+
+```
+┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐     ┌────────┐
+│Teacher │     │Frontend│     │ Backend│     │Doc Ext.│     │ LAMB   │
+└───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘     └───┬────┘
+    │              │              │              │              │
+    │ 1. Select submissions      │              │              │
+    │    & click "Evaluate"      │              │              │
+    │─────────────►│              │              │              │
+    │              │              │              │              │
+    │              │ 2. POST /api/activities/{id}/evaluate     │
+    │              │    {file_submission_ids: [...]}           │
+    │              │─────────────►│              │              │
+    │              │              │              │              │
+    │              │              │ 3. Mark submissions        │
+    │              │              │    as 'pending'            │
+    │              │              │              │              │
+    │              │ 4. {success: true, queued: N}             │
+    │              │◄─────────────│              │              │
+    │              │              │              │              │
+    │  5. Show modal              │ 6. Background thread       │
+    │     Start polling           │    starts processing       │
+    │◄─────────────│              │              │              │
+    │              │              │              │              │
+    │              │ 7. GET /evaluation-status  │              │
+    │              │─────────────►│              │              │
+    │              │ {overall_status, counts, submissions}     │
+    │              │◄─────────────│              │              │
+    │              │              │              │              │
+    │              │              │──────────────►│              │
+    │              │              │ 8. Extract text from file  │
+    │              │              │◄──────────────│              │
+    │              │              │              │              │
+    │              │              │ 9. POST /chat/completions  │
+    │              │              │─────────────────────────────►│
+    │              │              │              │              │
+    │              │              │    AI Response (rubric +   │
+    │              │              │    NOTA FINAL: X.X)        │
+    │              │              │◄─────────────────────────────│
+    │              │              │              │              │
+    │              │              │ 10. Parse response,        │
+    │              │              │     extract score          │
+    │              │              │              │              │
+    │              │              │ 11. Save to grades table:  │
+    │              │              │     ai_score, ai_comment   │
+    │              │              │              │              │
+    │              │              │ 12. Update file_submission:│
+    │              │              │     evaluation_status =    │
+    │              │              │     'completed'            │
+    │              │              │              │              │
+    │              │ 13. Poll detects completion               │
+    │  14. Modal   │◄─────────────│              │              │
+    │      shows   │              │              │              │
+    │      results │              │              │              │
+    │◄─────────────│              │              │              │
+```
+
+### 6.2 Dual Grading System
+
+LAMBA implements a two-stage grading workflow:
+
+| Stage | Fields | Description |
+|-------|--------|-------------|
+| **1. AI Evaluation** | `ai_score`, `ai_comment`, `ai_evaluated_at` | Proposed grade from LAMB |
+| **2. Professor Review** | `score`, `comment` | Final grade for LMS |
+
+**Teacher Options:**
+- "Accept AI Grade" per submission → copies `ai_score` → `score`
+- "Accept All AI Grades" button → bulk copy for all submissions
+- Manually enter different score/comment
+- Only `score` (final grade) is sent to Moodle
+
+### 6.3 Evaluation Status Constants
+
+```python
+STATUS_PENDING = 'pending'      # Queued for processing
+STATUS_PROCESSING = 'processing' # Currently being evaluated
+STATUS_COMPLETED = 'completed'   # Successfully evaluated
+STATUS_ERROR = 'error'          # Evaluation failed
+EVALUATION_TIMEOUT_MINUTES = 5  # Stuck evaluations reset after 5 min
 ```
 
 ---
 
-## 5. Security Considerations
+## 7. LTI Integration
 
-### 5.1 Authentication & Authorization
+### 7.1 LTI Launch Flow
 
-| Mechanism | Implementation |
-|-----------|----------------|
-| LTI OAuth | HMAC-SHA1 signature validation (planned) |
-| Session cookies | HTTP-only, Secure (HTTPS), SameSite=Lax |
-| Admin auth | Password-protected, environment variables |
-| Role enforcement | Checked at router/service level |
+```
+1. User clicks LTI tool in Moodle
+2. Moodle POSTs to /lti with signed parameters
+3. LAMBA extracts LTI data:
+   - user_id, lis_person_name_full, lis_person_contact_email_primary
+   - context_id, context_title (course)
+   - resource_link_id, resource_link_title (activity)
+   - roles (learner/instructor)
+   - lis_result_sourcedid (for grade passback)
+   - tool_consumer_instance_guid (Moodle instance ID)
+4. Create/update Moodle instance, User, Course in DB
+5. Generate session_id = MD5(user_id + context_id + resource_link_id)
+6. Store LTI data in lti_data_store[session_id]
+7. Set lti_session cookie
+8. Redirect to / (student) or /actividad/{id} (teacher)
+```
 
-### 5.2 Data Protection
+### 7.2 Session Management
 
-| Concern | Mitigation |
-|---------|------------|
-| SQL Injection | SQLAlchemy ORM with parameterized queries |
-| Path Traversal | `FileStorageService.is_within_uploads()` validation |
-| XSS | Svelte's automatic HTML escaping |
-| CSRF | SameSite cookies, same-origin requests |
-| Secrets in code | Environment variables for credentials |
+**Cookie-based (primary):**
+```python
+response.set_cookie(
+    key="lti_session",
+    value=session_id,
+    httponly=True,
+    secure=is_https,
+    samesite="none" if is_https else "lax",  # For iframe compatibility
+    max_age=3600
+)
+```
 
-### 5.3 File Upload Security
+**Header-based (fallback for iframe issues):**
+```javascript
+// Frontend stores session in sessionStorage
+sessionStorage.setItem('lti_session', sessionId);
+
+// API calls include header
+headers.set('X-LTI-Session', sessionId);
+```
+
+### 7.3 Role Checking
 
 ```python
-# Validation checklist:
-# 1. Size limit: 50MB max
-# 2. Path sanitization
-# 3. Filename sanitization
-# 4. Storage outside web root
-# 5. Access control via API (not direct)
+def check_teacher_role(lti_data):
+    roles = lti_data['roles'].lower()
+    return any(role in roles for role in ['administrator', 'instructor', 'teacher', 'admin'])
+
+def check_student_role(lti_data):
+    roles = lti_data['roles'].lower()
+    return 'learner' in roles or 'student' in roles
 ```
 
 ---
 
-## 6. Deployment Architecture
+## 8. Environment Configuration
 
-### 6.1 Single-Server Deployment
+### 8.1 Required Variables
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Production Server                        │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              HTTPS Server (https_server.py)           │   │
-│  │                    Port 9099                          │   │
-│  │  ┌────────────────────────────────────────────────┐  │   │
-│  │  │              FastAPI Application               │  │   │
-│  │  │                                                │  │   │
-│  │  │  ┌────────────────┐  ┌────────────────────┐   │  │   │
-│  │  │  │   API Routes   │  │   Static Files     │   │  │   │
-│  │  │  │   /api/*       │  │   /app/* (SvelteKit│   │  │   │
-│  │  │  │   /lti         │  │   build)           │   │  │   │
-│  │  │  └────────────────┘  └────────────────────┘   │  │   │
-│  │  └────────────────────────────────────────────────┘  │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                              │
-│  ┌──────────────────────┐  ┌──────────────────────────┐     │
-│  │     SQLite DB        │  │     uploads/             │     │
-│  │     lamba.db         │  │     (file storage)       │     │
-│  └──────────────────────┘  └──────────────────────────┘     │
-│                                                              │
-│  ┌──────────────────────┐                                   │
-│  │    ssl/              │                                   │
-│  │    cert.pem, key.pem │                                   │
-│  └──────────────────────┘                                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 6.2 Environment Configuration
-
-**Required Variables**:
 ```env
-# LTI Configuration
-OAUTH_CONSUMER_KEY=your_consumer_key
+# LTI Configuration (REQUIRED)
 LTI_SECRET=your_secret
+OAUTH_CONSUMER_KEY=your_key
 
-# Database
+# Must match Moodle's External Tool configuration
+```
+
+### 8.2 Optional Variables
+
+```env
+# Database (default: SQLite)
 DATABASE_URL=sqlite:///./lamba.db
 
-# LAMB Integration
+# HTTPS (for production)
+HTTPS_ENABLED=true
+
+# CORS
+ALLOWED_ORIGINS=https://your-moodle.edu
+
+# LAMB AI Evaluation
 LAMB_API_URL=http://lamb.lamb-project.org:9099
 LAMB_BEARER_TOKEN=your_token
 LAMB_TIMEOUT=30
 
-# Admin
+# Admin Dashboard
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=secure_password
 
-# Optional
-HTTPS_ENABLED=true
-ALLOWED_ORIGINS=https://your-moodle.edu
-```
-
-### 6.3 Build Process
-
-```bash
-# Backend (production)
-cd backend
-pip install -r requirements.txt
-python generate_ssl_cert.py  # First time only
-python https_server.py
-
-# Frontend (build for production)
-cd frontend/svelte-app
-npm install
-npm run build
-# Output: frontend/build/ → served by backend
+# Debug Mode (shows raw AI responses to teachers)
+DEBUG=false
 ```
 
 ---
 
-## 7. Scalability Considerations
+## 9. Frontend Architecture
 
-### 7.1 Current Limitations
-
-| Component | Limitation | Impact |
-|-----------|------------|--------|
-| SQLite | Single-writer, file-based | ~100 concurrent users |
-| In-memory sessions | Lost on restart | Requires re-login |
-| Single-process | No horizontal scaling | Bounded by server capacity |
-| Synchronous LAMB calls | Blocking during evaluation | Slow batch operations |
-
-### 7.2 Future Scaling Path
+### 9.1 Route Structure
 
 ```
-Phase 1 (Current)           Phase 2 (Medium-term)       Phase 3 (Long-term)
-─────────────────           ─────────────────────       ─────────────────────
-Single Server               Multi-Process               Distributed
-SQLite                      PostgreSQL                  PostgreSQL + Redis
-In-memory sessions          Redis sessions              Redis Cluster
-Sync LAMB calls             Async + Celery              Message Queue (RabbitMQ)
+/                           → Main page (role-based view)
+  - Student: Submit file or join group
+  - Teacher: Create activity form
+
+/actividad/[activityId]     → Activity detail
+  - Teacher: View submissions, grade, evaluate
+
+/admin                      → Admin login
+/admin/dashboard            → Admin dashboard
+/admin/dashboard/activities → Activity management
+/admin/dashboard/users      → User management
+/admin/dashboard/grades     → Grade management
+...
+```
+
+### 9.2 State Management (Svelte 5 Runes)
+
+```svelte
+<script>
+  // Reactive state
+  let loading = $state(true);
+  let submissionsData = $state(null);
+  let error = $state(null);
+  
+  // Derived values
+  let isTeacher = $derived(userRole === 'teacher');
+  
+  // Effects
+  $effect(() => {
+    if (activityId) loadSubmissions();
+  });
+</script>
+```
+
+### 9.3 Key Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `Nav.svelte` | `lib/components/` | Main navigation |
+| `AdminNav.svelte` | `lib/components/` | Admin sidebar |
+| `ActivityForm.svelte` | `lib/components/` | Create activity form |
+| `DataTable.svelte` | `lib/components/` | Reusable data table |
+| `LanguageSelector.svelte` | `lib/components/` | i18n language picker |
+
+### 9.4 Authentication (`lib/auth.js`)
+
+```javascript
+// Initialize from URL (after LTI redirect)
+initLTISession();
+
+// Get stored session
+getLTISessionId();
+
+// Fetch with LTI session
+await ltiAwareFetch('/api/activities/123/submissions');
+
+// Role checking
+isStudentRole(roles);
+isTeacherOrAdminRole(roles);
 ```
 
 ---
 
-## 8. Monitoring & Observability
+## 10. Document Extraction
 
-### 8.1 Logging Strategy
+### 10.1 Supported Formats
+
+| Format | Library | Extensions |
+|--------|---------|------------|
+| PDF | pypdf | `.pdf` |
+| Word | python-docx | `.docx`, `.doc` |
+| Text | Built-in | `.txt`, `.md`, `.py`, `.java`, `.cpp`, `.c`, `.js`, `.html`, `.css`, `.json`, `.xml` |
+
+### 10.2 Usage
 
 ```python
-# Current: Python logging module
-logging.basicConfig(level=logging.INFO)
+from document_extractor import DocumentExtractor
 
-# Log categories:
-# - LTI launch events
-# - Authentication events
-# - LAMB API interactions
-# - Grade passback results
-# - Error conditions
+text = DocumentExtractor.extract_text_from_file(file_path)
+preview = DocumentExtractor.get_text_preview(text, max_length=500)
 ```
-
-### 8.2 Health Indicators
-
-| Endpoint | Check |
-|----------|-------|
-| `/docs` | FastAPI operational |
-| `/api/admin/check-session` | Backend + DB |
-| Moodle LTI launch | Full integration |
 
 ---
 
-## 9. Testing Strategy
+## 11. File Storage Structure
 
-### 9.1 Test Types
+```
+backend/uploads/
+└── {moodle_id}/
+    └── {course_id}/
+        └── {activity_id}/
+            └── {submission_id}/
+                └── {sanitized_filename}
+```
 
-| Type | Framework | Location | Coverage |
-|------|-----------|----------|----------|
-| Unit (Backend) | pytest | `backend/tests/` | Services, utilities |
-| Unit (Frontend) | Vitest | `frontend/svelte-app/src/tests/lib/` | Utilities, formatters |
-| Integration | Vitest | `frontend/svelte-app/src/tests/integration/` | API client tests |
-| Functional | pytest | `backend/tests/test_functional.py` | End-to-end workflows |
+**Security:**
+- Files stored outside web root
+- Access only via `/api/downloads/{path}` with teacher role
+- Path traversal prevented by `FileStorageService.is_within_uploads()`
 
-### 9.2 Running Tests
+---
+
+## 12. Common Patterns
+
+### 12.1 Composite Key Queries
+
+```python
+# Always filter by both activity_id AND moodle_id
+activity = db.query(ActivityDB).filter(
+    ActivityDB.id == activity_id,
+    ActivityDB.course_moodle_id == moodle_id
+).first()
+```
+
+### 12.2 Error Handling
+
+```python
+@router.post("/{activity_id}/evaluate")
+async def evaluate_activity(activity_id: str, request: Request):
+    try:
+        lti_data = get_lti_session_data(request)  # Raises 401/404
+        if not check_teacher_role(lti_data):
+            raise HTTPException(status_code=403, detail="Solo profesores...")
+        # ... business logic ...
+    except HTTPException:
+        raise  # Re-raise HTTP errors as-is
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error interno")
+```
+
+### 12.3 Background Task Pattern
+
+```python
+# Router starts background task
+@router.post("/{activity_id}/evaluate")
+async def evaluate_activity(activity_id: str, request: Request, background_tasks: BackgroundTasks):
+    # Validate, mark as pending
+    start_result = EvaluationService.start_evaluation(...)
+    
+    # Queue background work
+    background_tasks.add_task(
+        run_background_evaluation,
+        activity_id=activity_id,
+        file_submission_ids=start_result['queued_ids'],
+        evaluator_id=evaluator_id
+    )
+    
+    return {"success": True, "queued": start_result['queued']}
+```
+
+---
+
+## 13. Debugging & Troubleshooting
+
+### 13.1 Debug Mode
+
+Enable in `.env`:
+```env
+DEBUG=true
+```
+
+When enabled, teachers see raw AI responses in the evaluation modal.
+
+### 13.2 Admin Debug Endpoints
 
 ```bash
-# Backend
+# Test LAMB connectivity
+GET /api/admin/debug/lamb
+
+# Verify specific model
+POST /api/admin/debug/lamb/verify-model
+{"evaluator_id": "your_evaluator"}
+```
+
+### 13.3 Common Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "Activity not found" | LTI session expired | Re-launch from Moodle |
+| AI grade shows but no score | Score format not matched | Check LAMB response format |
+| Grades not syncing to Moodle | Missing `lis_result_sourcedid` | Student must have launched via LTI |
+| Cookies not working in iframe | SameSite policy | Use HTTPS + `SameSite=None` |
+
+### 13.4 Score Extraction Debug
+
+If AI evaluation completes but `ai_score` is NULL:
+
+1. Check `ai_comment` in database - does it contain a score?
+2. Check format matches patterns in `_extract_score_and_feedback`:
+   - `NOTA FINAL: 8.5`
+   - `## Nota: 8.5`
+   - `Score: 8.5`
+   - `8.5/10`
+
+3. Add new pattern to `lamb_api_service.py` if needed.
+
+---
+
+## 14. Testing
+
+### 14.1 Backend Tests
+
+```bash
 cd backend
 pytest tests/
+```
 
-# Frontend
+### 14.2 Frontend Tests
+
+```bash
 cd frontend/svelte-app
 npm run test
 ```
 
----
+### 14.3 Test Files
 
-## 10. Code Organization Patterns
-
-### 10.1 Service Layer Pattern
-
-```python
-# Each service encapsulates business logic for a domain
-class ActivitiesService:
-    @staticmethod
-    def create_activity(...) -> Activity:
-        # Validation
-        # Database operations
-        # Return domain model
-        
-    @staticmethod
-    def create_submission(...) -> OptimizedSubmissionView:
-        # File handling
-        # Database operations
-        # Group logic
-```
-
-### 10.2 Router Pattern
-
-```python
-# Routers handle HTTP concerns, delegate to services
-@router.post("/")
-async def create_activity(activity_data: ActivityCreate, request: Request):
-    # Extract session data
-    # Validate permissions
-    # Call service
-    # Format response
-```
-
-### 10.3 Model Separation
-
-```python
-# DB Models (db_models.py) - SQLAlchemy
-class ActivityDB(Base):
-    __tablename__ = "activities"
-    # Database-specific fields and relationships
-
-# API Models (models.py) - Pydantic
-class Activity(BaseModel):
-    # Serialization, validation, API contracts
-```
+| File | Type | Coverage |
+|------|------|----------|
+| `backend/tests/test_endpoints.py` | Integration | API endpoints |
+| `backend/tests/test_functional.py` | Functional | End-to-end flows |
+| `frontend/.../tests/lib/auth.test.js` | Unit | Auth utilities |
+| `frontend/.../tests/lib/formatters.test.js` | Unit | Formatters |
+| `frontend/.../tests/integration/api.test.js` | Integration | API client |
 
 ---
 
-## 11. Extension Points
+## 15. Development Quick Reference
 
-### 11.1 Adding New LMS Support
+### 15.1 Start Development Servers
 
-1. Create new authentication handler
-2. Implement grade passback protocol (LTI 1.3, etc.)
-3. Add LMS-specific user provisioning
+```bash
+# Backend (with auto-reload)
+cd backend
+uv run -m uvicorn main:app --reload --port 9091
 
-### 11.2 Adding New File Types
+# Frontend (dev mode)
+cd frontend/svelte-app
+npm run dev
+```
 
-1. Extend `document_extractor.py`
-2. Add extraction logic for new MIME types
-3. Update frontend file input accept list
+### 15.2 Build for Production
 
-### 11.3 Adding New Evaluation Providers
+```bash
+# Frontend
+cd frontend/svelte-app
+npm run build
+# Output: frontend/build/ → served by backend
 
-1. Create new service similar to `LAMBAPIService`
-2. Implement `evaluate_text()` interface
-3. Add configuration for provider selection
+# Backend serves both API and static frontend
+python https_server.py  # or main.py
+```
+
+### 15.3 Database Inspection
+
+```bash
+cd backend
+sqlite3 lamba.db
+
+# Useful queries
+.tables
+.schema grades
+SELECT * FROM grades WHERE ai_score IS NOT NULL;
+```
 
 ---
 
-## 12. Related Documentation
+## 16. Related Documentation
 
 - [PRD](./prd.md) - Product Requirements Document
 - [API Documentation](../backend/API_DOCUMENTATION.md) - Full API reference

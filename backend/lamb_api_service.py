@@ -320,31 +320,48 @@ class LAMBAPIService:
     def _extract_score_and_feedback(content: str) -> Dict[str, Any]:
         """Extrae nota y feedback del contenido de texto
         
-        Busca los formatos:
+        Busca múltiples formatos de nota/puntuación:
         - "NOTA FINAL: X.X"
         - "FINAL SCORE: X.X"
+        - "Nota: X.X" (with optional markdown like ## or **)
+        - "Score: X.X"
+        - "Puntuación: X.X"
+        - "Calificación: X.X"
+        - "Grade: X.X"
         """
         score = None
         
-        # Buscar los patrones "NOTA FINAL: X.X" o "FINAL SCORE: X.X"
-        pattern = r'(?:NOTA\s+FINAL|FINAL\s+SCORE)\s*:\s*(\d+\.?\d*)'
-        match = re.search(pattern, content, re.IGNORECASE)
+        # List of patterns to try, in order of specificity (most specific first)
+        patterns = [
+            # Most specific: "NOTA FINAL" or "FINAL SCORE"
+            r'(?:NOTA\s+FINAL|FINAL\s+SCORE)\s*:\s*(\d+\.?\d*)',
+            # Spanish variants with optional markdown (##, **, etc.)
+            r'(?:#*\s*\**\s*)(?:Nota|Puntuación|Calificación)\s*(?:\**)\s*:\s*(\d+\.?\d*)',
+            # English variants with optional markdown
+            r'(?:#*\s*\**\s*)(?:Score|Grade|Mark)\s*(?:\**)\s*:\s*(\d+\.?\d*)',
+            # Fallback: any "X.X/10" or "X.X / 10" pattern near end of text
+            r'(\d+\.?\d*)\s*/\s*10\s*(?:puntos?|points?)?\s*$',
+        ]
         
-        if match:
-            try:
-                score = float(match.group(1))
-                if 0 <= score <= 10:
-                    logging.info(f"Nota extraída: {score}")
-                else:
-                    logging.warning(f"Nota fuera de rango (0-10): {score}")
+        for pattern in patterns:
+            match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+            if match:
+                try:
+                    score = float(match.group(1))
+                    if 0 <= score <= 10:
+                        logging.info(f"Nota extraída con patrón '{pattern}': {score}")
+                        break
+                    else:
+                        logging.warning(f"Nota fuera de rango (0-10): {score}, continuando búsqueda...")
+                        score = None
+                except (ValueError, IndexError) as e:
+                    logging.error(f"Error al convertir nota a float: {str(e)}")
                     score = None
-            except (ValueError, IndexError) as e:
-                logging.error(f"Error al convertir nota a float: {str(e)}")
-                score = None
         
-        # Si no se encuentra nota en el formato esperado, loguear una advertencia
+        # Si no se encuentra nota en ningún formato, loguear una advertencia
         if score is None:
-            logging.warning("No se encontró el formato 'NOTA FINAL: X.X' o 'FINAL SCORE: X.X' en la respuesta del agente LAMB")
+            logging.warning("No se encontró ningún formato de nota reconocido en la respuesta del agente LAMB")
+            logging.warning(f"Últimos 500 caracteres de la respuesta: {content[-500:]}")
         
         return {'score': score, 'comment': content, 'raw_response': content}
 
