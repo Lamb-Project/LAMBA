@@ -167,7 +167,14 @@
       "savedWithErrors": "Se guardaron {saved} calificación(es) correctamente ({failed} fallidas)",
       "noGradesToSave": "No hay calificaciones para guardar",
       "errorSaving": "Error al guardar las calificaciones",
-      "invalidScore": "La nota para una de las entregas debe estar entre 0 y 10"
+      "invalidScore": "La nota para una de las entregas debe estar entre 0 y 10",
+      "aiProposed": "Nota Propuesta por IA",
+      "finalScore": "Nota Final (0-10)",
+      "finalComment": "Comentario / Feedback Final",
+      "acceptAiGrade": "Aceptar Nota IA",
+      "acceptAllAiGrades": "Aceptar Todas las Notas IA",
+      "accepting": "Aceptando...",
+      "aiGradesAccepted": "Se aceptaron {count} nota(s) IA como notas finales"
     },
     "group": {
       "code": "Grupo {code}",

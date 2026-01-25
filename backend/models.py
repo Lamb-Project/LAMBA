@@ -90,12 +90,18 @@ class ActivityResponse(BaseModel):
 class Grade(BaseModel):
     id: str
     file_submission_id: str
-    score: float  # Score 
-    comment: Optional[str] = None  # Feedback comment
+    # AI proposed grade
+    ai_score: Optional[float] = None  # AI proposed score (0-10)
+    ai_comment: Optional[str] = None  # AI feedback
+    ai_evaluated_at: Optional[datetime] = None
+    # Final grade (from professor)
+    score: Optional[float] = None  # Professor's final score (0-10)
+    comment: Optional[str] = None  # Professor's feedback
     created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
-    @field_serializer('created_at')
-    def serialize_created_at(self, value: Optional[datetime]) -> Optional[str]:
+    @field_serializer('created_at', 'updated_at', 'ai_evaluated_at')
+    def serialize_datetime(self, value: Optional[datetime]) -> Optional[str]:
         return value.isoformat() + 'Z' if value else None
 
 # Group submission model

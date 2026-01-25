@@ -37,6 +37,9 @@
   let selectedForEvaluation = $state({}); // {file_submission_id: boolean}
   let selectAllEvaluation = $state(false);
   
+  // Accept AI grades state
+  let acceptingAiGrades = $state(false);
+  
   // Debug mode state
   let debugMode = $state(false);
   let evaluationDebugInfo = $state(null);
@@ -283,6 +286,55 @@
       }, 10000);
     } finally {
       sendingGrades = false;
+    }
+  }
+  
+  async function acceptAllAiGrades() {
+    try {
+      acceptingAiGrades = true;
+      
+      const response = await ltiAwareFetch(`/api/grades/activity/${activityId}/accept-ai-grades`, {
+        method: 'POST'
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        // Reload submissions to show updated grades
+        await loadSubmissions();
+        
+        // Show success message
+        evaluationMessage = {
+          type: 'success',
+          message: $_('activity.grading.aiGradesAccepted', { values: { count: result.updated } }),
+          details: null
+        };
+      } else {
+        evaluationMessage = {
+          type: 'error',
+          message: result.detail || result.message || $_('errors.connectionError'),
+          details: null
+        };
+      }
+      
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        evaluationMessage = null;
+      }, 5000);
+      
+    } catch (err) {
+      console.error('Error accepting AI grades:', err);
+      evaluationMessage = {
+        type: 'error',
+        message: $_('errors.connectionError'),
+        details: null
+      };
+      
+      setTimeout(() => {
+        evaluationMessage = null;
+      }, 5000);
+    } finally {
+      acceptingAiGrades = false;
     }
   }
   
@@ -898,6 +950,23 @@
               {/if}
             </button>
             
+            <!-- Accept All AI Grades Button -->
+            <button
+              onclick={acceptAllAiGrades}
+              disabled={acceptingAiGrades}
+              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            >
+              {#if acceptingAiGrades}
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                {$_('activity.grading.accepting')}
+              {:else}
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                {$_('activity.grading.acceptAllAiGrades')}
+              {/if}
+            </button>
+            
             <!-- Send Grades to Moodle Button -->
             <button
               onclick={sendGradesToMoodle}
@@ -1227,13 +1296,46 @@
                   </div>
                 </div>
                 
-                <!-- Inline Grading Fields -->
+                <!-- Grading Section -->
                 <div class="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
                   <h5 class="text-sm font-medium text-gray-700 mb-3">{$_('activity.grading.title')}</h5>
+                  
+                  <!-- AI Proposed Grade (if available) -->
+                  {#if submission.grade?.ai_score !== null && submission.grade?.ai_score !== undefined}
+                    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-blue-800">
+                          🤖 {$_('activity.grading.aiProposed')}
+                        </span>
+                        <button
+                          type="button"
+                          onclick={() => {
+                            updateGrade(submission.file_submission.id, 'score', submission.grade.ai_score?.toString() || '');
+                            updateGrade(submission.file_submission.id, 'comment', submission.grade.ai_comment || '');
+                          }}
+                          class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          {$_('activity.grading.acceptAiGrade')}
+                        </button>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
+                        <div class="md:col-span-1">
+                          <span class="text-blue-700 font-medium">{$_('activity.grading.scoreLabel')}:</span>
+                          <span class="ml-1">{submission.grade.ai_score}/10</span>
+                        </div>
+                        <div class="md:col-span-3">
+                          <span class="text-blue-700 font-medium">{$_('activity.grading.commentLabel')}:</span>
+                          <p class="mt-1 text-blue-900 whitespace-pre-wrap text-xs max-h-32 overflow-y-auto">{submission.grade.ai_comment || '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  {/if}
+                  
+                  <!-- Final Grade (editable) -->
                   <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="md:col-span-1">
                       <label for="score-{submission.file_submission.id}" class="block text-sm font-medium text-gray-700 mb-1">
-                        {$_('activity.grading.scoreLabel')}
+                        {$_('activity.grading.finalScore')}
                       </label>
                       <input
                         id="score-{submission.file_submission.id}"
@@ -1249,7 +1351,7 @@
                     </div>
                     <div class="md:col-span-3">
                       <label for="comment-{submission.file_submission.id}" class="block text-sm font-medium text-gray-700 mb-1">
-                        {$_('activity.grading.commentLabel')}
+                        {$_('activity.grading.finalComment')}
                       </label>
                       <textarea
                         id="comment-{submission.file_submission.id}"
@@ -1261,9 +1363,9 @@
                       ></textarea>
                     </div>
                   </div>
-                  {#if submission.grade}
+                  {#if submission.grade?.updated_at}
                     <div class="mt-2 text-xs text-gray-500">
-                      {$_('activity.grading.lastUpdate', { values: { date: formatDate(submission.grade.created_at) } })}
+                      {$_('activity.grading.lastUpdate', { values: { date: formatDate(submission.grade.updated_at) } })}
                     </div>
                   {/if}
                 </div>
@@ -1378,13 +1480,46 @@
                   </div>
                 </div>
                 
-                <!-- Inline Grading Fields -->
+                <!-- Grading Section -->
                 <div class="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
                   <h5 class="text-sm font-medium text-gray-700 mb-3">{$_('activity.grading.groupTitle')}</h5>
+                  
+                  <!-- AI Proposed Grade (if available) -->
+                  {#if group.grade?.ai_score !== null && group.grade?.ai_score !== undefined}
+                    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-blue-800">
+                          🤖 {$_('activity.grading.aiProposed')}
+                        </span>
+                        <button
+                          type="button"
+                          onclick={() => {
+                            updateGrade(group.file_submission.id, 'score', group.grade.ai_score?.toString() || '');
+                            updateGrade(group.file_submission.id, 'comment', group.grade.ai_comment || '');
+                          }}
+                          class="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          {$_('activity.grading.acceptAiGrade')}
+                        </button>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
+                        <div class="md:col-span-1">
+                          <span class="text-blue-700 font-medium">{$_('activity.grading.scoreLabel')}:</span>
+                          <span class="ml-1">{group.grade.ai_score}/10</span>
+                        </div>
+                        <div class="md:col-span-3">
+                          <span class="text-blue-700 font-medium">{$_('activity.grading.commentLabel')}:</span>
+                          <p class="mt-1 text-blue-900 whitespace-pre-wrap text-xs max-h-32 overflow-y-auto">{group.grade.ai_comment || '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  {/if}
+                  
+                  <!-- Final Grade (editable) -->
                   <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="md:col-span-1">
                       <label for="score-{group.file_submission.id}" class="block text-sm font-medium text-gray-700 mb-1">
-                        {$_('activity.grading.scoreLabel')}
+                        {$_('activity.grading.finalScore')}
                       </label>
                       <input
                         id="score-{group.file_submission.id}"
@@ -1400,7 +1535,7 @@
                     </div>
                     <div class="md:col-span-3">
                       <label for="comment-{group.file_submission.id}" class="block text-sm font-medium text-gray-700 mb-1">
-                        {$_('activity.grading.commentLabel')}
+                        {$_('activity.grading.finalComment')}
                       </label>
                       <textarea
                         id="comment-{group.file_submission.id}"
@@ -1412,9 +1547,9 @@
                       ></textarea>
                     </div>
                   </div>
-                  {#if group.grade}
+                  {#if group.grade?.updated_at}
                     <div class="mt-2 text-xs text-gray-500">
-                      {$_('activity.grading.lastUpdate', { values: { date: formatDate(group.grade.created_at) } })}
+                      {$_('activity.grading.lastUpdate', { values: { date: formatDate(group.grade.updated_at) } })}
                     </div>
                   {/if}
                 </div>

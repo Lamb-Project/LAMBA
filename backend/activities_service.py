@@ -473,9 +473,13 @@ class ActivitiesService:
                             grade_dict = {
                                 'id': grade.id,
                                 'file_submission_id': grade.file_submission_id,
+                                'ai_score': grade.ai_score,
+                                'ai_comment': grade.ai_comment,
+                                'ai_evaluated_at': grade.ai_evaluated_at.isoformat() + 'Z' if grade.ai_evaluated_at else None,
                                 'score': grade.score,
                                 'comment': grade.comment,
-                                'created_at': grade.created_at.isoformat() + 'Z' if grade.created_at else None
+                                'created_at': grade.created_at.isoformat() + 'Z' if grade.created_at else None,
+                                'updated_at': grade.updated_at.isoformat() + 'Z' if grade.updated_at else None
                             }
                         groups_dict[file_submission.group_code] = {
                             'group_code': file_submission.group_code,

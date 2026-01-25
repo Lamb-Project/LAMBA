@@ -17,8 +17,23 @@ def is_debug_mode() -> bool:
 class GradeService:
     
     @staticmethod
+    def _db_grade_to_model(db_grade: GradeDB) -> Grade:
+        """Convert database grade to model"""
+        return Grade(
+            id=db_grade.id,
+            file_submission_id=db_grade.file_submission_id,
+            ai_score=db_grade.ai_score,
+            ai_comment=db_grade.ai_comment,
+            ai_evaluated_at=db_grade.ai_evaluated_at,
+            score=db_grade.score,
+            comment=db_grade.comment,
+            created_at=db_grade.created_at,
+            updated_at=db_grade.updated_at
+        )
+    
+    @staticmethod
     def create_grade(grade_request: GradeRequest) -> Grade:
-        """Create a new grade for a file submission"""
+        """Create a new grade for a file submission (sets final grade)"""
         db = get_db_session()
         try:
             # Check if file submission exists
@@ -29,18 +44,13 @@ class GradeService:
             # Check if grade already exists for this file submission
             existing_grade = db.query(GradeDB).filter(GradeDB.file_submission_id == grade_request.file_submission_id).first()
             if existing_grade:
-                # Update existing grade
+                # Update existing grade (final grade only)
                 existing_grade.score = grade_request.score
                 existing_grade.comment = grade_request.comment
+                existing_grade.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 
-                return Grade(
-                    id=existing_grade.id,
-                    file_submission_id=existing_grade.file_submission_id,
-                    score=existing_grade.score,
-                    comment=existing_grade.comment,
-                    created_at=existing_grade.created_at
-                )
+                return GradeService._db_grade_to_model(existing_grade)
             
             # Create new grade
             grade_id = str(uuid.uuid4())
@@ -56,13 +66,7 @@ class GradeService:
             db.commit()
             db.refresh(db_grade)
             
-            return Grade(
-                id=db_grade.id,
-                file_submission_id=db_grade.file_submission_id,
-                score=db_grade.score,
-                comment=db_grade.comment,
-                created_at=db_grade.created_at
-            )
+            return GradeService._db_grade_to_model(db_grade)
         finally:
             db.close()
     
@@ -75,19 +79,13 @@ class GradeService:
             if not db_grade:
                 return None
             
-            return Grade(
-                id=db_grade.id,
-                file_submission_id=db_grade.file_submission_id,
-                score=db_grade.score,
-                comment=db_grade.comment,
-                created_at=db_grade.created_at
-            )
+            return GradeService._db_grade_to_model(db_grade)
         finally:
             db.close()
     
     @staticmethod
     def create_or_update_grade(file_submission_id: str, score: float, comment: Optional[str] = None) -> Grade:
-        """Create or update a grade for a file submission
+        """Create or update the final grade for a file submission (professor's grade)
         
         Raises:
             FileNotFoundError: If the file submission doesn't exist
@@ -102,19 +100,14 @@ class GradeService:
             # Check if grade already exists for this file submission
             existing_grade = db.query(GradeDB).filter(GradeDB.file_submission_id == file_submission_id).first()
             if existing_grade:
-                # Update existing grade
+                # Update existing grade (final grade only, preserve AI grade)
                 existing_grade.score = score
                 existing_grade.comment = comment
+                existing_grade.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(existing_grade)
                 
-                return Grade(
-                    id=existing_grade.id,
-                    file_submission_id=existing_grade.file_submission_id,
-                    score=existing_grade.score,
-                    comment=existing_grade.comment,
-                    created_at=existing_grade.created_at
-                )
+                return GradeService._db_grade_to_model(existing_grade)
             
             # Create new grade
             grade_id = str(uuid.uuid4())
@@ -130,13 +123,7 @@ class GradeService:
             db.commit()
             db.refresh(db_grade)
             
-            return Grade(
-                id=db_grade.id,
-                file_submission_id=db_grade.file_submission_id,
-                score=db_grade.score,
-                comment=db_grade.comment,
-                created_at=db_grade.created_at
-            )
+            return GradeService._db_grade_to_model(db_grade)
         finally:
             db.close()
     

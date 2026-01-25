@@ -167,7 +167,14 @@
         "savedWithErrors": "{saved} grade(s) saved successfully ({failed} failed)",
         "noGradesToSave": "No grades to save",
         "errorSaving": "Error while saving grades",
-        "invalidScore": "The score for one of the submissions must be between 0 and 10"
+        "invalidScore": "The score for one of the submissions must be between 0 and 10",
+        "aiProposed": "AI Proposed Grade",
+        "finalScore": "Final Score (0-10)",
+        "finalComment": "Final Comment / Feedback",
+        "acceptAiGrade": "Accept AI Grade",
+        "acceptAllAiGrades": "Accept All AI Grades",
+        "accepting": "Accepting...",
+        "aiGradesAccepted": "{count} AI grade(s) accepted as final grades"
       },
       "group": {
         "code": "Group {code}",

@@ -312,38 +312,36 @@ class EvaluationService:
                         })
                         continue
                     
-                    # Get score and comment from parsed response
-                    score = parsed.get('score')
-                    comment = parsed.get('comment', '') or ''
+                    # Get AI score and comment from parsed response
+                    ai_score = parsed.get('score')  # Can be None if no score pattern found
+                    ai_comment = parsed.get('comment', '') or ''
                     
-                    # If no score was extracted, treat as error
-                    if score is None:
+                    # Log if no score was extracted (but don't treat as error)
+                    if ai_score is None:
                         logging.warning(f"No score found in LAMB response for submission {file_sub_id}")
-                        logging.warning(f"Raw response: {parsed.get('raw_response', 'N/A')}")
-                        file_sub.evaluation_status = STATUS_ERROR
-                        file_sub.evaluation_error = "LAMB response did not contain a valid score (expected 'NOTA FINAL: X.X' or 'FINAL SCORE: X.X')"
-                        db.commit()
-                        results['errors'].append({
-                            'file_submission_id': file_sub_id,
-                            'error': f"No score in LAMB response. Comment received: {comment[:200] if comment else 'None'}..."
-                        })
-                        continue
+                        logging.warning(f"AI comment received: {ai_comment[:200] if ai_comment else 'None'}...")
                     
+                    # Create or update grade with AI proposed values
                     existing_grade = db.query(GradeDB).filter(
                         GradeDB.file_submission_id == file_sub_id
                     ).first()
                     
                     if existing_grade:
-                        existing_grade.score = score
-                        existing_grade.comment = comment
-                        existing_grade.created_at = datetime.now(timezone.utc)
+                        # Update AI fields only, preserve professor's final grade
+                        existing_grade.ai_score = ai_score
+                        existing_grade.ai_comment = ai_comment
+                        existing_grade.ai_evaluated_at = datetime.now(timezone.utc)
                         results['grades_updated'] += 1
                     else:
                         new_grade = GradeDB(
                             id=str(uuid.uuid4()),
                             file_submission_id=file_sub_id,
-                            score=score,
-                            comment=comment,
+                            ai_score=ai_score,
+                            ai_comment=ai_comment,
+                            ai_evaluated_at=datetime.now(timezone.utc),
+                            # score and comment remain None until professor sets them
+                            score=None,
+                            comment=None,
                             created_at=datetime.now(timezone.utc)
                         )
                         db.add(new_grade)

@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request
+from datetime import datetime, timezone
 import logging
 
 from models import GradeRequest, GradeUpdate, GradeResponse
 from grade_service import GradeService
+from database import get_db
+from db_models import GradeDB, FileSubmissionDB
 
 router = APIRouter()
 
@@ -74,4 +77,63 @@ async def grade_submission(submission_id: str, grade_data: GradeUpdate, request:
     except Exception as e:
         logging.error(f"Error al calificar entrega: {str(e)}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+
+@router.post("/activity/{activity_id}/accept-ai-grades")
+async def accept_all_ai_grades(activity_id: str, request: Request):
+    """Accept all AI proposed grades as final grades for an activity"""
+    try:
+        lti_data = get_lti_session_data(request)
+        
+        if not check_teacher_role(lti_data):
+            raise HTTPException(status_code=403, detail="Solo profesores pueden aceptar calificaciones")
+        
+        moodle_id = lti_data.get('tool_consumer_instance_guid')
+        if not moodle_id:
+            raise HTTPException(status_code=400, detail="No se encontró ID de Moodle en la sesión")
+        
+        db = next(get_db())
+        try:
+            # Get all file submissions for this activity that have AI grades
+            file_submissions = db.query(FileSubmissionDB).filter(
+                FileSubmissionDB.activity_id == activity_id,
+                FileSubmissionDB.activity_moodle_id == moodle_id
+            ).all()
+            
+            updated_count = 0
+            skipped_count = 0
+            
+            for file_sub in file_submissions:
+                grade = db.query(GradeDB).filter(
+                    GradeDB.file_submission_id == file_sub.id
+                ).first()
+                
+                if grade and grade.ai_score is not None:
+                    # Copy AI grade to final grade
+                    grade.score = grade.ai_score
+                    grade.comment = grade.ai_comment
+                    grade.updated_at = datetime.now(timezone.utc)
+                    updated_count += 1
+                else:
+                    skipped_count += 1
+            
+            db.commit()
+            
+            logging.info(f"Accepted AI grades for activity {activity_id}: {updated_count} updated, {skipped_count} skipped")
+            
+            return {
+                "success": True,
+                "message": f"AI grades accepted: {updated_count} grades updated, {skipped_count} skipped (no AI grade)",
+                "updated": updated_count,
+                "skipped": skipped_count
+            }
+            
+        finally:
+            db.close()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error accepting AI grades: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 

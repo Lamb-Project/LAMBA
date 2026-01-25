@@ -137,9 +137,18 @@ class GradeDB(Base):
     
     id = Column(String, primary_key=True, index=True)
     file_submission_id = Column(String, ForeignKey("file_submissions.id"), nullable=False)
-    score = Column(Float, nullable=False)  # Score 
-    comment = Column(Text, nullable=True)  # Feedback comment
+    
+    # AI proposed grade (from automatic evaluation)
+    ai_score = Column(Float, nullable=True)  # AI proposed score (0-10)
+    ai_comment = Column(Text, nullable=True)  # AI feedback/comment
+    ai_evaluated_at = Column(DateTime, nullable=True)  # When AI evaluation was done
+    
+    # Final grade (from professor, sent to LMS)
+    score = Column(Float, nullable=True)  # Professor's final score (0-10)
+    comment = Column(Text, nullable=True)  # Professor's feedback comment
+    
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     file_submission = relationship("FileSubmissionDB", back_populates="grade")
