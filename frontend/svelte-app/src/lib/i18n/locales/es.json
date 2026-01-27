@@ -104,6 +104,7 @@
       "gradesUpdated": "Se actualizaron {count} evaluaciones",
       "selectAllForEvaluation": "Seleccionar todas para evaluar automáticamente",
       "selectSubmissionsToEvaluate": "Selecciona al menos una entrega para evaluar automáticamente",
+      "selectedCount": "{count} seleccionadas",
       "sortBy": "Ordenar por",
       "sortName": "Nombre",
       "sortDate": "Fecha",
@@ -171,7 +172,9 @@
       "enterValidCode": "Introduce un código válido",
       "studentNoteLabel": "Nota para el profesor (opcional)",
       "studentNotePlaceholder": "Añade una nota o comentario para tu profesor...",
-      "studentNoteHint": "Esta nota será visible para tus profesores al revisar tu entrega."
+      "studentNoteHint": "Esta nota será visible para tus profesores al revisar tu entrega.",
+      "downloadFile": "Descargar archivo entregado",
+      "downloading": "Descargando..."
     },
     "grading": {
       "title": "Evaluación",
@@ -193,6 +196,7 @@
       "aiProposed": "Nota Propuesta por IA",
       "finalScore": "Nota Final (0-10)",
       "finalComment": "Comentario / Feedback Final",
+      "unsavedChanges": "Sin guardar",
       "acceptAiGrade": "Aceptar Nota IA",
       "acceptAllAiGrades": "Aceptar Todas las Notas IA",
       "accepting": "Aceptando...",

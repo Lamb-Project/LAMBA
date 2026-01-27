@@ -104,6 +104,7 @@
       "gradesUpdated": "S'han actualitzat {count} avaluacions",
       "selectAllForEvaluation": "Seleccionar-ho tot per a l'avaluació automàtica",
       "selectSubmissionsToEvaluate": "Selecciona almenys un lliurament per avaluar automàticament",
+      "selectedCount": "{count} seleccionats",
       "sortBy": "Ordenar per",
       "sortName": "Nom",
       "sortDate": "Data",
@@ -171,7 +172,9 @@
       "studentNotePlaceholder": "Afegeix una nota o comentari per al teu professor...",
       "studentNoteHint": "Aquesta nota serà visible per als teus professors en revisar el teu lliurament.",
       "copyCode": "Copiar Codi",
-      "codeCopied": "Copiat!"
+      "codeCopied": "Copiat!",
+      "downloadFile": "Descarregar fitxer lliurat",
+      "downloading": "Descarregant..."
     },
     "grading": {
       "title": "Avaluació",
@@ -193,6 +196,7 @@
       "aiProposed": "Nota Proposada per IA",
       "finalScore": "Nota Final (0-10)",
       "finalComment": "Comentari / Feedback Final",
+      "unsavedChanges": "Sense guardar",
       "acceptAiGrade": "Acceptar Nota IA",
       "acceptAllAiGrades": "Acceptar Totes les Notes IA",
       "accepting": "Acceptant...",

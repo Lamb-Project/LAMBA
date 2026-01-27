@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { fetchLTIData, isStudentRole, isTeacherOrAdminRole, ltiAwareFetch } from '$lib/auth.js';
   import ActivityForm from '$lib/components/ActivityForm.svelte';
+  import Markdown from '$lib/components/Markdown.svelte';
   import { _, locale } from 'svelte-i18n';
   import { formatDate, formatFileSize } from '$lib/i18n/formatters.js';
 
@@ -28,6 +29,9 @@
   let codeError = $state(null);
   let codeSuccess = $state(null);
   let groupMembers = $state([]);
+  
+  // Download state
+  let downloadingFile = $state(false);
 
   // Activities list (for teachers/admins)
   let courseInfo = $state(null);
@@ -230,6 +234,42 @@
     }
   }
 
+  async function downloadMyFile() {
+    if (!studentView?.student_submission?.file_submission) return;
+    
+    try {
+      downloadingFile = true;
+      
+      const response = await ltiAwareFetch('/api/submissions/my-file/download');
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || $_('errors.connectionError'));
+      }
+      
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = studentView.student_submission.file_submission.file_name || 'download';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+    } catch (err) {
+      console.error('Error downloading file:', err);
+      uploadError = err.message || $_('errors.connectionError');
+    } finally {
+      downloadingFile = false;
+    }
+  }
+
   // Functions for teachers/admins
   async function loadCourseInfo() {
     try {
@@ -301,7 +341,14 @@
 								</div>
 {:else if userRole === 'teacher'}
   <!-- Teacher/Admin View - Create Activity -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- LAMBA Logo Banner -->
+    <div class="bg-white shadow rounded-lg mb-6">
+      <div class="p-6 flex justify-center">
+        <img src="/img/lamba.jpg" alt="LAMBA - Learning Activities & Machine-Based Assessment" class="h-48 w-auto object-contain">
+      </div>
+    </div>
+    
     <!-- Page Header -->
     <div class="mb-8">
       <div class="flex justify-between items-center">
@@ -423,6 +470,27 @@
                   {#if studentView.activity.activity_type === 'group' && studentView.student_submission.file_submission.group_code && !studentView.student_submission.is_group_leader}
                     <p><strong>{$_('activity.student.groupCode')}:</strong> <span class="font-mono bg-gray-100 px-2 py-1 rounded">{studentView.student_submission.file_submission.group_code}</span></p>
                   {/if}
+                  
+                  <!-- Download button for student's submitted file -->
+                  <button
+                    type="button"
+                    onclick={downloadMyFile}
+                    disabled={downloadingFile}
+                    class="mt-3 inline-flex items-center px-3 py-1.5 border border-green-600 text-sm font-medium rounded-md text-green-700 bg-white hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {#if downloadingFile}
+                      <svg class="animate-spin -ml-0.5 mr-2 h-4 w-4 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {$_('activity.student.downloading')}
+                    {:else}
+                      <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                      </svg>
+                      {$_('activity.student.downloadFile')}
+                    {/if}
+                  </button>
                 </div>
               </div>
             </div>
@@ -502,7 +570,7 @@
                       <div class="mt-3">
                         <p class="text-sm font-medium text-[#2271b3] mb-1">{$_('activity.student.gradeFeedback')}:</p>
                         <div class="bg-white p-3 rounded-md border border-[#2271b3]/20">
-                          <p class="text-sm text-gray-700 whitespace-pre-wrap">{studentView.student_submission.grade.comment}</p>
+                          <Markdown content={studentView.student_submission.grade.comment} class="text-sm text-gray-700" />
                         </div>
                       </div>
                     {/if}

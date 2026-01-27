@@ -104,6 +104,7 @@
       "gradesUpdated": "{count} ebaluazio eguneratu dira",
       "selectAllForEvaluation": "Hautatu guztiak ebaluazio automatikorako",
       "selectSubmissionsToEvaluate": "Hautatu gutxienez entrega bat automatikoki ebaluatzeko",
+      "selectedCount": "{count} hautatuta",
       "sortBy": "Ordenatu",
       "sortName": "Izena",
       "sortDate": "Data",
@@ -171,7 +172,9 @@
       "studentNotePlaceholder": "Gehitu ohar edo iruzkin bat zure irakaslearentzat...",
       "studentNoteHint": "Ohar hau zure irakasleek ikusiko dute zure entrega berrikustean.",
       "copyCode": "Kopiatu Kodea",
-      "codeCopied": "Kopiatuta!"
+      "codeCopied": "Kopiatuta!",
+      "downloadFile": "Deskargatu bidalitako fitxategia",
+      "downloading": "Deskargatzen..."
     },
     "grading": {
       "title": "Ebaluazioa",
@@ -193,6 +196,7 @@
       "aiProposed": "IA-k proposatutako nota",
       "finalScore": "Azken Nota (0-10)",
       "finalComment": "Azken Iruzkina / Feedbacka",
+      "unsavedChanges": "Gorde gabe",
       "acceptAiGrade": "Onartu IA Nota",
       "acceptAllAiGrades": "Onartu IA Nota Guztiak",
       "accepting": "Onartzen...",

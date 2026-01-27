@@ -5,6 +5,7 @@
   import { _ } from 'svelte-i18n';
   import { formatDate, formatFileSize, formatDateForInput } from '$lib/i18n/formatters.js';
   import { ltiAwareFetch, getLTISessionId } from '$lib/auth.js';
+  import Markdown from '$lib/components/Markdown.svelte';
   
   let submissionsData = $state(null);
   let loading = $state(true);
@@ -29,9 +30,24 @@
   
   // Manual grading state - now inline, not modal
   let editedGrades = $state({}); // {file_submission_id: {score: '', comment: ''}}
+  let originalGrades = $state({}); // Store original values to detect changes
+  let focusedTextarea = $state(null); // Track which textarea is focused
   let savingGrades = $state(false);
   let saveGradesError = $state(null);
   let saveGradesSuccess = $state(null);
+  
+  // Function to check if a grade has unsaved changes
+  function hasUnsavedChanges(fileSubmissionId) {
+    const edited = editedGrades[fileSubmissionId];
+    const original = originalGrades[fileSubmissionId];
+    if (!edited || !original) return false;
+    return edited.score !== original.score || edited.comment !== original.comment;
+  }
+  
+  // Derived: check if any grades have unsaved changes
+  let anyUnsavedChanges = $derived.by(() => {
+    return Object.keys(editedGrades).some(id => hasUnsavedChanges(id));
+  });
   
   // Automatic evaluation selection state
   let selectedForEvaluation = $state({}); // {file_submission_id: boolean}
@@ -129,6 +145,9 @@
   });
   
   let totalGroupPages = $derived(Math.ceil((submissionsData?.groups?.length || 0) / itemsPerPage));
+  
+  // Derived: count of selected submissions for evaluation
+  let selectedCount = $derived(Object.values(selectedForEvaluation).filter(Boolean).length);
   
   // Helper to reset pagination when sorting changes
   function handleSortChange(newSortBy) {
@@ -299,26 +318,32 @@
     if (!submissionsData) return;
     
     const newEditedGrades = {};
+    const newOriginalGrades = {};
     
     if (submissionsData.activity_type === 'individual' && submissionsData.submissions) {
       submissionsData.submissions.forEach(submission => {
         const fileSubId = submission.file_submission.id;
-        newEditedGrades[fileSubId] = {
+        const gradeData = {
           score: submission.grade?.score?.toString() || '',
           comment: submission.grade?.comment || ''
         };
+        newEditedGrades[fileSubId] = { ...gradeData };
+        newOriginalGrades[fileSubId] = { ...gradeData };
       });
     } else if (submissionsData.activity_type === 'group' && submissionsData.groups) {
       submissionsData.groups.forEach(group => {
         const fileSubId = group.file_submission.id;
-        newEditedGrades[fileSubId] = {
+        const gradeData = {
           score: group.grade?.score?.toString() || '',
           comment: group.grade?.comment || ''
         };
+        newEditedGrades[fileSubId] = { ...gradeData };
+        newOriginalGrades[fileSubId] = { ...gradeData };
       });
     }
     
     editedGrades = newEditedGrades;
+    originalGrades = newOriginalGrades;
   }
   
   function getDownloadUrl(filePath) {
@@ -1411,6 +1436,11 @@
                     {$_('activity.submissions.selectAllForEvaluation')}
                   </label>
                 </div>
+                {#if selectedCount > 0}
+                  <span class="text-sm font-medium text-[#2271b3]">
+                    {$_('activity.submissions.selectedCount', { values: { count: selectedCount } })}
+                  </span>
+                {/if}
               </div>
             {/if}
             
@@ -1537,7 +1567,13 @@
                         </div>
                         <div class="md:col-span-3">
                           <span class="text-blue-700 font-medium">{$_('activity.grading.commentLabel')}:</span>
-                          <p class="mt-1 text-blue-900 whitespace-pre-wrap text-xs max-h-32 overflow-y-auto">{submission.grade.ai_comment || '-'}</p>
+                          <div class="mt-1 text-blue-900 text-xs max-h-32 overflow-y-auto">
+                            {#if submission.grade.ai_comment}
+                              <Markdown content={submission.grade.ai_comment} class="text-blue-900 text-xs" />
+                            {:else}
+                              -
+                            {/if}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1563,16 +1599,23 @@
                       />
                     </div>
                     <div class="md:col-span-3">
-                      <label for="comment-{submission.file_submission.id}" class="block text-sm font-medium text-gray-700 mb-1">
+                      <label for="comment-{submission.file_submission.id}" class="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                         {$_('activity.grading.finalComment')}
+                        {#if hasUnsavedChanges(submission.file_submission.id)}
+                          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 animate-pulse">
+                            {$_('activity.grading.unsavedChanges')}
+                          </span>
+                        {/if}
                       </label>
                       <textarea
                         id="comment-{submission.file_submission.id}"
                         value={editedGrades[submission.file_submission.id]?.comment || ''}
                         oninput={(e) => updateGrade(submission.file_submission.id, 'comment', e.target.value)}
+                        onfocus={() => focusedTextarea = submission.file_submission.id}
+                        onblur={() => focusedTextarea = null}
                         disabled={isProcessing}
-                        rows={editedGrades[submission.file_submission.id]?.comment ? '10' : '2'}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        rows={focusedTextarea === submission.file_submission.id ? '12' : (editedGrades[submission.file_submission.id]?.comment ? '6' : '2')}
+                        class="block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2271b3] focus:border-[#2271b3] text-sm disabled:bg-gray-100 disabled:cursor-not-allowed transition-all duration-300 {hasUnsavedChanges(submission.file_submission.id) ? 'border-amber-400 bg-amber-50' : 'border-gray-300'}"
                         placeholder={$_('activity.grading.commentPlaceholder')}
                       ></textarea>
                     </div>
@@ -1642,6 +1685,11 @@
                     {$_('activity.submissions.selectAllForEvaluation')}
                   </label>
                 </div>
+                {#if selectedCount > 0}
+                  <span class="text-sm font-medium text-[#2271b3]">
+                    {$_('activity.submissions.selectedCount', { values: { count: selectedCount } })}
+                  </span>
+                {/if}
               </div>
             {/if}
             
@@ -1787,7 +1835,13 @@
                         </div>
                         <div class="md:col-span-3">
                           <span class="text-blue-700 font-medium">{$_('activity.grading.commentLabel')}:</span>
-                          <p class="mt-1 text-blue-900 whitespace-pre-wrap text-xs max-h-32 overflow-y-auto">{group.grade.ai_comment || '-'}</p>
+                          <div class="mt-1 text-blue-900 text-xs max-h-32 overflow-y-auto">
+                            {#if group.grade.ai_comment}
+                              <Markdown content={group.grade.ai_comment} class="text-blue-900 text-xs" />
+                            {:else}
+                              -
+                            {/if}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1813,16 +1867,23 @@
                       />
                     </div>
                     <div class="md:col-span-3">
-                      <label for="comment-{group.file_submission.id}" class="block text-sm font-medium text-gray-700 mb-1">
+                      <label for="comment-{group.file_submission.id}" class="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                         {$_('activity.grading.finalComment')}
+                        {#if hasUnsavedChanges(group.file_submission.id)}
+                          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 animate-pulse">
+                            {$_('activity.grading.unsavedChanges')}
+                          </span>
+                        {/if}
                       </label>
                       <textarea
                         id="comment-{group.file_submission.id}"
                         value={editedGrades[group.file_submission.id]?.comment || ''}
                         oninput={(e) => updateGrade(group.file_submission.id, 'comment', e.target.value)}
+                        onfocus={() => focusedTextarea = group.file_submission.id}
+                        onblur={() => focusedTextarea = null}
                         disabled={isProcessing}
-                        rows={editedGrades[group.file_submission.id]?.comment ? '6' : '2'}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#2271b3] focus:border-[#2271b3] text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        rows={focusedTextarea === group.file_submission.id ? '12' : (editedGrades[group.file_submission.id]?.comment ? '6' : '2')}
+                        class="block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2271b3] focus:border-[#2271b3] text-sm disabled:bg-gray-100 disabled:cursor-not-allowed transition-all duration-300 {hasUnsavedChanges(group.file_submission.id) ? 'border-amber-400 bg-amber-50' : 'border-gray-300'}"
                         placeholder={$_('activity.grading.commentPlaceholderGroup')}
                       ></textarea>
                     </div>

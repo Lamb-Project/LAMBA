@@ -104,6 +104,7 @@
       "gradesUpdated": "{count} evaluations updated",
       "selectAllForEvaluation": "Select all for automatic evaluation",
       "selectSubmissionsToEvaluate": "Select at least one submission to evaluate automatically",
+      "selectedCount": "{count} selected",
       "sortBy": "Sort by",
       "sortName": "Name",
       "sortDate": "Date",
@@ -171,7 +172,9 @@
       "enterValidCode": "Enter a valid code",
       "studentNoteLabel": "Note to professor (optional)",
       "studentNotePlaceholder": "Add a note or comment for your professor...",
-      "studentNoteHint": "This note will be visible to your professors when reviewing your submission."
+      "studentNoteHint": "This note will be visible to your professors when reviewing your submission.",
+      "downloadFile": "Download submitted file",
+      "downloading": "Downloading..."
     },
       "grading": {
         "title": "Grading",
@@ -193,6 +196,7 @@
         "aiProposed": "AI Proposed Grade",
         "finalScore": "Final Score (0-10)",
         "finalComment": "Final Comment / Feedback",
+        "unsavedChanges": "Unsaved",
         "acceptAiGrade": "Accept AI Grade",
         "acceptAllAiGrades": "Accept All AI Grades",
         "accepting": "Accepting...",

@@ -4,7 +4,6 @@
   import { onMount } from 'svelte';
   import { checkPendingActivity } from '../auth.js';
   import { _ } from 'svelte-i18n';
-  import LanguageSelector from './LanguageSelector.svelte';
   
   // Props para recibir datos LTI
   let { ltiData = null } = $props();
@@ -64,28 +63,26 @@
 
 <nav class="bg-white shadow">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="flex justify-between h-16">
+    <div class="flex justify-between h-20">
       <div class="flex">
         <!-- Logo -->
         <div class="flex-shrink-0 flex items-center">
-          <div class="flex items-center space-x-2">
+          <a href="https://lamb-project.org" target="_blank" rel="noopener noreferrer" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <!-- Image path updated to be relative to static dir -->
-            <img src="{base}/img/lamb_1.png" alt="LAMB Logo" class="h-14">
+            <img src="{base}/img/lamba.jpg" alt="LAMBA Logo" class="h-20">
             <div>
-              <div class="text-lg font-bold text-gray-900">
+              <div class="text-xl font-bold text-gray-900">
                 <span>{$_('nav.title')}</span> 
-                <span class="text-xs bg-gray-200 text-gray-700 px-1 py-0.5 rounded">v1.0</span>
+                <span class="text-sm bg-gray-200 text-gray-700 px-1 py-0.5 rounded">v0.2</span>
               </div>
-              <span class="text-xs text-gray-600">{$_('nav.subtitle')}</span>
+              <span class="text-sm text-gray-600">{$_('nav.subtitle')}</span>
             </div>
-          </div>
+          </a>
         </div>
       </div>
       
-      <!-- User info and language selector section -->
+      <!-- User info section -->
       <div class="flex items-center space-x-4">
-        <!-- Language Selector -->
-        <LanguageSelector />
         
         <!-- User info -->
         {#if ltiData}

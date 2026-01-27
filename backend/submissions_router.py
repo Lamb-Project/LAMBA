@@ -1,9 +1,15 @@
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from typing import Optional
 import logging
+import os
+import urllib.parse
 
 from models import GroupCodeSubmission, GroupCodeResponse, SubmissionResponse, OptimizedSubmissionView
 from activities_service import ActivitiesService
+from storage_service import FileStorageService
+from database import get_db_session
+from db_models import FileSubmissionDB, StudentSubmissionDB, UserDB
 
 router = APIRouter()
 
@@ -121,9 +127,6 @@ async def get_submission_members(submission_id: str, request: Request):
             raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
         
         # Obtener la entrega para obtener el group_code
-        from database import get_db_session
-        from db_models import FileSubmissionDB, StudentSubmissionDB, UserDB
-        
         db = get_db_session()
         try:
             file_submission = db.query(FileSubmissionDB).filter(FileSubmissionDB.id == submission_id).first()
@@ -160,4 +163,77 @@ async def get_submission_members(submission_id: str, request: Request):
         raise
     except Exception as e:
         logging.error(f"Error obteniendo miembros del grupo: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+@router.get("/my-file/download")
+async def download_my_submission_file(request: Request):
+    """Permite a un estudiante descargar el archivo de su propia entrega (o la de su grupo)"""
+    try:
+        lti_data = get_lti_session_data(request)
+        
+        if not check_student_role(lti_data):
+            raise HTTPException(status_code=403, detail="Solo estudiantes pueden descargar sus entregas")
+        
+        activity_id = lti_data.get('resource_link_id', '')
+        if not activity_id:
+            raise HTTPException(status_code=400, detail="No se encontró resource_link_id en los datos LTI")
+        
+        student_id = lti_data.get('user_id', '')
+        activity_moodle_id = lti_data.get('tool_consumer_instance_guid', '')
+        student_moodle_id = lti_data.get('tool_consumer_instance_guid', '')
+        
+        if not activity_moodle_id:
+            raise HTTPException(status_code=400, detail="No se encontró tool_consumer_instance_guid en los datos LTI")
+        
+        db = get_db_session()
+        try:
+            # Find the student's submission for this activity
+            student_submission = db.query(StudentSubmissionDB).filter(
+                StudentSubmissionDB.activity_id == activity_id,
+                StudentSubmissionDB.activity_moodle_id == activity_moodle_id,
+                StudentSubmissionDB.student_id == student_id,
+                StudentSubmissionDB.student_moodle_id == student_moodle_id
+            ).first()
+            
+            if not student_submission:
+                raise HTTPException(status_code=404, detail="No se encontró ninguna entrega para este estudiante")
+            
+            # Get the associated file submission (this works for both individual and group submissions)
+            file_submission = db.query(FileSubmissionDB).filter(
+                FileSubmissionDB.id == student_submission.file_submission_id
+            ).first()
+            
+            if not file_submission:
+                raise HTTPException(status_code=404, detail="No se encontró el archivo de la entrega")
+            
+            # Resolve the file path
+            file_path = file_submission.file_path
+            decoded_path = urllib.parse.unquote(file_path)
+            full_path = FileStorageService.resolve_path(decoded_path)
+            
+            # Security check: ensure file is within uploads directory
+            if not FileStorageService.is_within_uploads(full_path):
+                raise HTTPException(status_code=403, detail="Acceso denegado al archivo")
+            
+            if not os.path.isfile(full_path):
+                raise HTTPException(status_code=404, detail="Archivo no encontrado en el sistema")
+            
+            # Use the original filename for download
+            download_filename = file_submission.file_name or os.path.basename(full_path)
+            
+            logging.info(f"Student {student_id} downloading their submission file: {download_filename}")
+            
+            return FileResponse(
+                path=full_path,
+                filename=download_filename,
+                media_type=file_submission.file_type or 'application/octet-stream'
+            )
+            
+        finally:
+            db.close()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error descargando archivo de entrega del estudiante: {str(e)}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
