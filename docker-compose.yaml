@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+
+  # Backend service - serves the API and built frontend
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "9091:9091"
+    volumes: 
+      - ./backend:/app
+      - ./frontend/build:/app/../frontend/build:ro
+      - ./backend/uploads:/app/uploads
+    env_file:
+      - ./backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: uvicorn main:app --host 0.0.0.0 --port 9091
+    restart: unless-stopped
+
+volumes: 
+  frontend_node_modules: 
