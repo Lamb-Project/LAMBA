@@ -347,8 +347,11 @@
   }
   
   function getDownloadUrl(filePath) {
-    // Build download URL with LTI session for iframe compatibility
-    const baseUrl = `/api/downloads/${encodeURIComponent(filePath)}`;
+    // Encode each path segment individually, preserving '/' separators.
+    // Using encodeURIComponent on the whole path turns '/' into '%2F',
+    // which breaks reverse proxies and FastAPI's {path:path} routing.
+    const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+    const baseUrl = `/api/downloads/${encodedPath}`;
     const sessionId = getLTISessionId();
     if (sessionId) {
       return `${baseUrl}?lti_session=${encodeURIComponent(sessionId)}`;
